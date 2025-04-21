@@ -1,7 +1,8 @@
 import { NextRequest,NextResponse } from "next/server";
 import { cookies } from 'next/headers'
+import { decrypt } from '@/app/lib/session';
 
-export function middleware(request:NextRequest){
+export async function middleware(request:NextRequest){
     
     const path = request.nextUrl.pathname
     const isPublicPath = path ==="/login" || path === "/signUp";
@@ -14,6 +15,13 @@ export function middleware(request:NextRequest){
     if (!isPublicPath && !token) {
         return NextResponse.redirect(new URL('/login', request.url));
     }
+
+    if(path.startsWith("/admin")){
+        const session = await decrypt(token);
+        if(!session || session?.role !== "admin"){
+            return NextResponse.redirect(new URL("/", request.url));  
+        }
+    }
      
     return NextResponse.next();
 }
@@ -25,6 +33,7 @@ export const config = {
         '/profile', 
         '/signUp',
         '/posts',
-         '/media/:path*'
+         '/media/:path*',
+        //   '/admin/:path*'
     ], 
   }

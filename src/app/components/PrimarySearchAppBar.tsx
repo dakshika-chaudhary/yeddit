@@ -18,11 +18,12 @@ import {
 } from "@mui/material";
 import { styled, alpha } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
-import SearchIcon from "@mui/icons-material/Search";
+
 import AccountCircle from "@mui/icons-material/AccountCircle";
 import MoreIcon from "@mui/icons-material/MoreVert";
 import Link from "next/link";
 import LogoutButton from "../logout/page";
+
 
 const Search = styled("div")(({ theme }) => ({
   position: "relative",
@@ -51,16 +52,40 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   [theme.breakpoints.up("md")]: { width: "20ch" },
 }));
 
-const UserMenuItems = ({ userId, onClose }: { userId: string | null; onClose: () => void }) => (
+interface UserType {
+  _id: string;
+  role: string;
+  name?: string;
+  email?: string;
+}
+
+const UserMenuItems = ({ userId, onClose }: {  userId: UserType  | null; onClose: () => void }) => {
+
+    return (
   <Box sx={{ minWidth: 180 }}>
     <List>
       {userId ? (
-        <>
+        <>  {console.log(`role is:${userId.role}`)}
+           {userId.role === "admin" ? (
+          
+              <ListItem onClick={onClose}>
+                <Link href="/admin/dashboard">Admin Dashboard</Link>
+              </ListItem>
+            ) : (
+              console.log(`userId is: ${userId._id}`),
+              userId._id ? (
+                
+                <ListItem onClick={onClose}>
+                  <Link href={`/profile/${userId._id}`}>Profile</Link>
+                </ListItem>
+              ) : null
+              // <ListItem onClick={onClose}>
+              //   <Link href={`/profile/${userId.id}`}>Profile</Link>
+              // </ListItem>
+            )}
+      
           <ListItem onClick={onClose}>
-            <Link href={`/profile/${userId}`}>Profile</Link>
-          </ListItem>
-          <ListItem onClick={onClose}>
-            <Link href={`/users/${userId}`}>Your Posts</Link>
+            <Link href={`/users/${userId._id}`}>Your Posts</Link>
           </ListItem>
           <ListItem>
             <LogoutButton />
@@ -79,8 +104,9 @@ const UserMenuItems = ({ userId, onClose }: { userId: string | null; onClose: ()
     </List>
   </Box>
 );
+};
 
-export default function PrimarySearchAppBar({ userId }: { userId: string | null }) {
+export default function PrimarySearchAppBar({ userId }: { userId: UserType | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [mobileMenuAnchorEl, setMobileMenuAnchorEl] = useState<null | HTMLElement>(null);

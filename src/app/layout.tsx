@@ -5,8 +5,8 @@ import ClientThemeProvider from "@/app/components/ClientThemeProvider";
 import PrimarySearchAppBar from "@/app/components/PrimarySearchAppBar";
 import { getUserIdFromRequest } from "@/app/lib/getUserId"; // Our 
 import "./globals.css";
-
-
+import { getUserDetails } from "./actions";
+import { Toaster } from 'react-hot-toast';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,14 +32,21 @@ export default async function RootLayout({
   //this will help in importing the users Id to be used further
   const userId = await getUserIdFromRequest();
 
+ console.log(userId, "userId from layout");
+// Fetch the full user data using the userId
 
+const user = await getUserDetails(userId);
+  console.log(user, "user from layout");
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
       <ClientThemeProvider>
-          <PrimarySearchAppBar userId={userId} />
+          <PrimarySearchAppBar userId={user} />
          
-          <main>{children}</main>
+          <main>
+            {children}
+            <Toaster position="bottom-right" reverseOrder={false} />
+            </main>
         </ClientThemeProvider>
       </body>
     </html>

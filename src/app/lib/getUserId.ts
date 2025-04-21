@@ -12,6 +12,13 @@ export async function getUserIdFromRequest(): Promise<string | null> {
   }
 
   const sessionData = await getUserSession();
+  if (!sessionData) {
+    console.log("Session data not found for token:", sessionToken);
+    return null;
+  }
+
   console.log("session Token is reached for findin Profile",sessionToken)
   return sessionData?.id || null;
 }
+
+

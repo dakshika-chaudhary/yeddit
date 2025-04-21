@@ -11,6 +11,7 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import Box from "@mui/material/Box";
 import { Button } from "@mui/material";
+import toast from "react-hot-toast";
 
 const initialState = {
   message: "",
@@ -24,6 +25,7 @@ export function Signup() {
 
   useEffect(() => {
     if (state.redirect) {
+      toast.success("Sign up successful!");
       router.push(state.redirect);
     }
   }, [state.redirect, router]);
@@ -76,6 +78,12 @@ export function Signup() {
               error={state.errors.password.length > 0}
               helperText={state.errors.password[0] || ""}
             />
+
+<label>
+    <input type="radio" name="role" value="user" defaultChecked />
+    User
+  </label>
+  
 
             {state.message && (
               <Typography color="success.main" align="center">

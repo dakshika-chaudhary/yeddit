@@ -12,6 +12,7 @@ import Grid from "@mui/material/Grid";
 import TextField from "@mui/material/TextField";
 import Box from "@mui/material/Box";
 import { Button } from "@mui/material";
+import { toast } from "react-hot-toast";
 
 export function Login() {
   const router = useRouter();
@@ -26,12 +27,14 @@ export function Login() {
   // Redirect to /posts if login is successful
   useEffect(() => {
     if (state.redirect) {
+      toast.success("Login successful!");
       router.push(state.redirect);
     }
   }, [state.redirect, router]);
 
   useEffect(() => {
     console.log("Stored loginId:", localStorage.getItem("loginId"));
+   
   }, []);
 
   return (
@@ -80,9 +83,12 @@ export function Login() {
               <Grid item xs={12}>
                 <Typography color="success.main" align="center">
                   {state.message}
+                 
                 </Typography>
               </Grid>
             )}
+
+            
 
 <Grid item xs={12} sx={{ textAlign: "center", mt: 2 }}>
               <Typography variant="body2">

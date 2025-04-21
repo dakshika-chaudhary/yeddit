@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { logoutUser } from "../actions"; 
+import toast from "react-hot-toast";
 
 export default function LogoutButton() {
     const router = useRouter();
@@ -9,6 +10,7 @@ export default function LogoutButton() {
     const handleLogout = async () => {
       const response = await logoutUser();
       if (response.success) {
+        toast.success("Logged out successfully!");
         router.push("/login"); // Redirect after logout
       } else {
         alert("Logout failed. Try again!");
