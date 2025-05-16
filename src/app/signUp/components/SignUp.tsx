@@ -18,8 +18,9 @@ const initialState = {
   errors: { name: [], email: [], password: [] },
   redirect: "",
 };
+export const dynamic = 'force-dynamic';
 
-export function Signup() {
+export default function Signup() {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createUser, initialState);
 
@@ -91,7 +92,7 @@ export function Signup() {
               </Typography>
             )}
 
-            {/* Only one Submit Button inside the form */}
+           
             <Button type="submit" variant="contained" disabled={pending}>
               Sign Up
             </Button>

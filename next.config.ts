@@ -1,25 +1,21 @@
+// import type { NextConfig } from "next";
 
-// /** @type {import('next').NextConfig} */
-// const nextConfig = {
-//   images: {
-//     domains: ['img.youtube.com'],
-//   },
+// const nextConfig: NextConfig = {
+//   /* config options here */
 // };
 
-// module.exports = nextConfig;
+// export default nextConfig;
 
-/** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ["img.youtube.com"],
     remotePatterns: [
       {
-        protocol: "https",
-        hostname: "img.youtube.com",
-        pathname: "/vi/**", // Allow all YouTube thumbnails
+        protocol: 'https',
+        hostname: 'img.youtube.com',
+        pathname: '/vi/**',
       },
     ],
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

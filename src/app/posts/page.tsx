@@ -1,14 +1,14 @@
 
 "use client";
-// import { PostForm } from "@/app/components/PostForm";
 import { useEffect, useState } from "react";
-import { PostForm } from "./components/page";
+import  {PostForm } from "./components/posts";
 import { getUserSession, logoutUser } from "../actions";
 import { useRouter } from "next/navigation";
 import Container from "@mui/material/Container";
 import Link from "next/link";
-import {Button} from "@mui/material";
-import { Typography } from "@mui/material";
+import { Button } from "@mui/material";
+
+export const dynamic = 'force-dynamic';
 export default function PostPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
@@ -30,7 +30,7 @@ export default function PostPage() {
   // Handle logout function
   const handleLogout = async () => {
     try {
-      console.log("Logging out...");
+      
       await logoutUser();
 
       // Ensure session cleanup
@@ -45,13 +45,11 @@ export default function PostPage() {
     }
   };
 
-  console.log("Stored user in posts page:", userId);
+
 
   return (
     <div className="max-w-3xl mx-auto p-4">
-      <Container maxWidth="sm" align="center" className="p-4">
-        {/* <h1 className="text-2xl font-bold"></h1> */}
-       
+      <Container maxWidth="sm"  className="p-4" component="div">
         {!userId ? (
           <p className="text-red-500">
             You must be logged in to create a post.{" "}
@@ -63,8 +61,9 @@ export default function PostPage() {
           <PostForm userId={userId} />
         )}
         {userId && (
-          
-          <Button variant="contained" className="mt-4"  onClick={handleLogout}>Logout</Button>
+          <Button variant="contained" className="mt-4" onClick={handleLogout}>
+            Logout
+          </Button>
         )}
       </Container>
     </div>

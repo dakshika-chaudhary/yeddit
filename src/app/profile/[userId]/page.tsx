@@ -1,28 +1,39 @@
-import { getUserDetails, getUserSession } from "@/app/actions";
-// import UserProfile from "@/app/components/UserProfile";
+
+
+import { getUserSession } from "@/app/actions";
 import UserProfile from "./components/UserProfile";
-import { getUserIdFromRequest } from "@/app/lib/getUserId";
-import AdminDashboard from "@/app/admin/dashboard/component/AdminPage";
-import { useRouter } from 'next/router';
 
-export default async function ProfilePage({ params }: { params: { userId: string } }) {
-  if (!params) {
-    console.log(" No params received!");
-  } else {
-    console.log(" Params found:", params);
+interface ProfilePageProps {
+  params: Promise<{
+    userId: string;
+  }>;
+}
+export const dynamic = 'force-dynamic';
+export default async function ProfilePage({ params }: ProfilePageProps) {
+  try {
+   
+    const resolvedParams = await params;
+    
+    const { userId } = resolvedParams;
+
+    if (!userId) {
+      return <p>User ID is missing!</p>;
+    }
+
+   
+
+    
+    const user = await getUserSession();
+
+    if (!user) {
+      return <p>User not found or not logged in.</p>;
+    }
+
+
+
+    return <UserProfile user={user} />;
+  } catch (error) {
+    console.log("Error fetching user data:", error);
+    return <p>Error fetching user data. Please try again later.</p>;
   }
-  const { userId } =  params;
-  console.log("User ID in ProfilePage:", userId);
- 
-  // Fetch user data based on the userId
-  const user = await getUserSession();
-
-  if (!user) {
-    return <p>User not found or not logged in.</p>;
-  }
-
-  console.log("user is",user)
-
-  return <UserProfile user={user} />
-};
-
+}

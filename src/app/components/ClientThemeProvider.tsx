@@ -1,6 +1,4 @@
-//Because we want its effet 
 
-// src/app/components/ClientThemeProvider.tsx
 "use client";
 
 import { ThemeProvider, createTheme } from "@mui/material/styles";
@@ -14,6 +12,7 @@ const theme = createTheme({
   },
 });
 
+export const dynamic = 'force-dynamic';
 export default function ClientThemeProvider({
   children,
 }: {

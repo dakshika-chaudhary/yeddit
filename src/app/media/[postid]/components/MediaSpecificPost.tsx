@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -11,34 +10,35 @@ import { red } from '@mui/material/colors';
 import IconButton from '@mui/material/IconButton';
 import DeleteIcon from '@mui/icons-material/Delete';
 import toast from 'react-hot-toast';
+import {Comment,SanitizedPostss } from '../../../../../types/postTypes';
 
-interface Comment {
-  _id: string;
-  user: {
-    _id: string;
-    name: string;
-  };
-  text: string;
-  createdAt: string;
+
+interface MediaSpecificPostProps {
+  post: SanitizedPostss; 
 }
-
-interface Post {
-  _id: string;
-  title: string;
-  description: string;
-  youtubeCode?: string;
-  likes: string[];
-  dislikes: string[];
-  readBy: string[];
-  comments: Comment[];
-}
-
-export default function MediaSpecificPost({ post }: { post: Post }) {
+export const dynamic = 'force-dynamic';
+export default  function MediaSpecificPost({ post}: MediaSpecificPostProps) {
   const [newComment, setNewComment] = useState('');
-  const [comments, setComments] = useState<Comment[]>(post.comments || []);
-  const router = useRouter();
-  const postId = post._id;
+  
 
+  const [comments, setComments] = useState<Comment[]>(
+  (post?.comments || []).map((comment) => ({
+    _id: comment._id,
+    userId: comment.userId,  // Directly use userId
+    username: comment.username || 'Anonymous', 
+    text: comment.text,
+    createdAt: comment.createdAt || '',
+  }))
+);
+
+
+  const router = useRouter();
+  
+
+  if (!post || !post._id) {
+    return <p>No post available.</p>;
+  }
+  const postId = post._id;
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
 
@@ -60,10 +60,8 @@ export default function MediaSpecificPost({ post }: { post: Post }) {
       setComments((prev) => [
         {
           _id: result.comment._id,
-          user: {
-            _id: result.comment.user._id,
-            name: result.comment.user.name || 'Anonymous',
-          },
+          userId: result.comment.userId,
+          username: result.comment.username || 'Anonymous',
           text: result.comment.text,
           createdAt: result.comment.createdAt
             ? new Date(result.comment.createdAt).toISOString()
@@ -71,6 +69,7 @@ export default function MediaSpecificPost({ post }: { post: Post }) {
         },
         ...prev,
       ]);
+     
 
       setNewComment('');
       toast.success('Comment added!');
@@ -80,52 +79,53 @@ export default function MediaSpecificPost({ post }: { post: Post }) {
     }
   };
 
-  const performPostDeletion = async(postId: string) => {
+  const performPostDeletion = async (postId: string) => {
     const confirm = window.confirm("Are you sure you want to delete this post?");
-    if(confirm) {
+    if (confirm) {
       try {
         const res = await deletedPost(postId);
+  
+        
         if (res?.success) {
           toast.success("Post deleted successfully");
-          router.push('/'); // Redirect after deletion
+  
+         
+          if (sessionStorage?.role !== "admin") {
+            
+            router.push('/'); // Redirect to homepage if not admin
+          } else {
+            router.push('/admin/dashboard'); 
+          }
         } else {
           toast.error("Failed to delete post");
         }
       } catch (error) {
-        console.error('Error deleting post:', error);
+      console.log(error)
         toast.error('Something went wrong.');
       }
     }
-  }
+  };
+  
 
   if (!post) {
     return <p>No post available.</p>;
   }
 
-//   const performCommentDeletion = async(postId:string,commentId: string) => {
-//     const confirm = window.confirm("Are you sure you want to delete this comment?");
-//     if(confirm){
-//       try{
-//         const res = await deleteComment(postId, commentId);
-//         if(res?.success){
-//           setComments((prev) => prev.filter(comment => comment._id !== commentId));
-//           toast.success("Comment deleted successfully");
-//       }
-//       else{
-//         toast.error("Failed to delete comment");
-//       }
-//     }
-//     catch(error){
-//       console.error('Error deleting comment:', error);
-//       toast.error('Something went wrong.');
-//     }
-//   }
-// }
+
 const performCommentDeletion = async (commentId: string) => {
   const confirmDelete = window.confirm('Are you sure you want to delete this comment?');
   if (!confirmDelete) return;
 
-  const res = await deleteComment(postId, commentId);
+  
+    const session = await getUserSession();
+    if (!session || !session.id) {
+      toast.error('You must be logged in to delete a comment.');
+      return;
+    }
+
+    const userId = session.id.toString();
+
+  const res = await deleteComment(postId, commentId,userId);
   if (res.success) {
     setComments(prev => prev.filter(comment => comment._id !== commentId));
     toast.success(res.message);
@@ -190,10 +190,12 @@ const performCommentDeletion = async (commentId: string) => {
           comments.map((comment) => (
             <Paper key={comment._id} sx={{ mt: 2, p: 2, borderRadius: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            
                 <Avatar sx={{ bgcolor: red[500], mr: 2 }}>
-                  {comment.user.name?.charAt(0).toUpperCase() || 'U'}
-                </Avatar>
-                <Typography variant="body1">{comment.user.name}</Typography>
+  {comment.username?.charAt(0).toUpperCase() || 'U'}
+</Avatar>
+<Typography variant="body1">{comment.username}</Typography>
+
               </Box>
               <Typography variant="body2" sx={{ mt: 1 }}>
                 {comment.text}
@@ -203,7 +205,7 @@ const performCommentDeletion = async (commentId: string) => {
               {new Date(comment.createdAt).toISOString()}
               </Typography>
               <IconButton
-                                      sx={{ marginright:14 }}
+                                      sx={{ marginRight:14 }}
                                  color="error" 
                                  onClick={() => performCommentDeletion(comment._id)}>
                                                   <DeleteIcon  />

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { logoutUser } from "../actions"; 
 import toast from "react-hot-toast";
-
+export const dynamic = 'force-dynamic';
 export default function LogoutButton() {
     const router = useRouter();
   

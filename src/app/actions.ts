@@ -1,25 +1,26 @@
 'use server';
 
 import mongoose from 'mongoose';
+
 import { z } from 'zod';
-import fs from "fs";
-import { google } from "googleapis";
+import { IPost ,IUserLean,LoginState,UserType} from '../../types/postTypes';
+
 import { hash,compare } from "bcryptjs";
 import { connect } from '@/dbConfig/dbConfig';
-import User from '@/models/userModel';  // Import user model
+import User from '@/models/userModel';  
 import Post from '@/models/PostModel';
 import { createSession } from "@/app/lib/session";
 import { cookies } from "next/headers";
 import { decrypt } from '@/app/lib/session';
 import bcrypt from 'bcryptjs';
 import axios from 'axios'
-import { title } from 'process';
-import { revalidatePath } from "next/cache";
-// Connect to the database
-connect();
 
-const API_KEY = process.env.YOUTUBE_API_KEY;
-// Define validation schema
+import { Postss } from '../../types/postTypes'; 
+import { IUser } from '../../types/postTypes';
+   connect();
+
+ 
+
 const loginSchema = z.object({
     email: z.string().email({message:'Invalid email'}),
     password: z.string().min(6, { message: "Password must be at least 6 characters" })
@@ -40,18 +41,30 @@ const schema = z.object({
       message: 'Contain at least one special character.',
     })
     .trim(),
-    role: z.enum(['user', 'admin']) // Default to 'user' if not provided
+    role: z.enum(['user', 'admin']) 
   
 });
 
-export async function createUser(prevState: any, formData: FormData) {
-  // Validate input fields
+
+type CreateUserState = {
+  message: string;
+  errors?: {
+    name?: string[];
+    email?: string[];
+    password?: string[];
+    role?: string;
+  };
+};
+
+export async function createUser( prevState: CreateUserState,formData: FormData) {
+  const data = formData as unknown as globalThis.FormData;
   const validatedFields = schema.safeParse({
-     name : formData.get('name')?.toString(),
-    email : formData.get('email')?.toString(),
-     password : formData.get('password')?.toString(),
-     role: formData.get('role')?.toString() || 'user',
+     name : data.get('name')?.toString(),
+     email : data.get('email')?.toString(),
+     password : data.get('password')?.toString(),
+     role: data.get('role')?.toString() || 'user',
   });
+  console.log(prevState);
 
   if (!validatedFields.success) {
     return { 
@@ -60,7 +73,7 @@ export async function createUser(prevState: any, formData: FormData) {
         name: validatedFields.error.flatten().fieldErrors.name || [],
         email: validatedFields.error.flatten().fieldErrors.email || [],
         password: validatedFields.error.flatten().fieldErrors.password || [],
-        role: formData.get('role')?.toString() || 'user',
+        role: data.get('role')?.toString() || 'user',
       }
     };
   }
@@ -79,34 +92,31 @@ export async function createUser(prevState: any, formData: FormData) {
       };
     }
 
-    // Hash password
     const hashedPassword = await hash(password, 10);
 
-    // Store user in the database
-    // const newUser = await User.create({name, email, password: hashedPassword });
     const newUser = await User.create({
        name,
         email,
          password:hashedPassword ,
          role,
         });
-        console.log("New user created:", newUser);
+        
 
     const sessionToken = await createSession(newUser._id.toString());
-    console.log("Created user session:", sessionToken);
+    
    const cookieStore = await cookies();
 
     cookieStore.set("session", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week expiry
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
       path: "/"
     });
     return { 
       message: "Signup successful!",
       errors: {name:[],email: [], password: []} ,
       redirect: role==='admin'? '/admin/dashboard':"/",};
-  } catch (error:any) {
+  } catch (error) {
     console.error('Error creating user:', error);
     return { 
       message: "Signup failed. Please try again.",
@@ -117,10 +127,10 @@ export async function createUser(prevState: any, formData: FormData) {
 }
 
 
-export async function loginUser(prevState: any, formData: FormData) {
-  const email = formData.get('email')?.toString();
-    const password = formData.get('password')?.toString();
-
+export async function loginUser( _prevState: LoginState,formData: FormData) {
+  const email = formData.get("email")?.toString();
+  const password = formData.get("password")?.toString();
+  
   const validatedFields = loginSchema.safeParse({ email, password });
 
   if (!validatedFields.success) {
@@ -148,13 +158,14 @@ export async function loginUser(prevState: any, formData: FormData) {
     if (!isPasswordValid) {
       return { message: "Invalid password", errors: { email: [], password: [] } };
     }
-    const cookieStore = await cookies(); // Await cookies() before using
+    const cookieStore = await cookies(); 
     const sessionToken = await createSession(existingUser._id.toString());
 
-    await cookieStore.set('session', sessionToken, { 
+     cookieStore.set('session', sessionToken, { 
+      path:'/',
       httpOnly: true, 
       secure: process.env.NODE_ENV === "production", 
-      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 1 week expiry
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) 
     });
     
     return { 
@@ -188,22 +199,19 @@ export async function getUserSession(): Promise<SessionUser | null> {
       return null;
     }
 
-
     const sessionData = await decrypt(sessionToken);
    
 
     if (!sessionData?.userId) {
-      console.log("Invalid or Expired Session:", sessionToken);
+    
       return null;
     }
 
     const user = await User.findById(sessionData.userId);
     if (!user) {
-      console.log("User not found in database for session:", sessionData.userId);
+      
       return null;
     }
-
-
 
     return {
       id: user._id.toString(),
@@ -213,11 +221,9 @@ export async function getUserSession(): Promise<SessionUser | null> {
     };
   } catch (error) {
     console.error("Error in getUserSession:", error);
-    return null;
+    throw error;  // Rethrow error to allow higher-level handlers to manage it
   }
 }
-
-
 
 
 export async function deletedPost(postId:string){
@@ -246,6 +252,7 @@ export async function deletedPost(postId:string){
 export async function deletedUser(userId:string){
   try{
     const session = await getUserSession();
+
     if(!session){
       return {success:false,message:"Unauthorized: Please log in to delete a user."};
     }
@@ -277,7 +284,9 @@ export async function getUsers(){
   try{
     const session = await getUserSession();
     if(!session){
-      return {success:false,message:"Unauthorized: Please log in to delete a user."};
+      return {
+        success:false,
+        message:"Unauthorized: Please log in to delete a user."};
     }
     const user = await User.findById(session.id);
     if(!user || user.role !== 'admin'){
@@ -291,14 +300,14 @@ export async function getUsers(){
      }
 
      const usersPosts = await Post.find({}).populate("userId").lean();
-
      const requiredUsers = users.filter((user)=>user)
 
+
      const formattedUsers = requiredUsers.map((user) => {
-      const formattedPosts = usersPosts
-        .filter((post) => post.userId?._id?.toString() === user._id.toString())
+     const formattedPosts = usersPosts
+        .filter((post) => post.userId?._id?.toString() === (user._id as string).toString())
         .map((post) => ({
-          _id: post._id.toString(),
+          _id: (post._id as string).toString(),
           title: post.title?.title?.toString() || post.title?.toString() || "",
           userId: post.userId?._id?.toString() || "Unknown",
           createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
@@ -315,23 +324,37 @@ export async function getUsers(){
             ? post.readBy.map((id) => id.toString())
             : [],
           likes: post.likes
-            ? post.likes.map((like) => like.userId?.toString?.() || like.toString())
+            ? post.likes.map((like: { userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString())
             : [],
           dislikes: post.dislikes
-            ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString())
+            ? post.dislikes.map((dislike:{ userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString())
             : [],
-          comments:
-            post.comments?.map((comment) => ({
-              _id: comment._id.toString(),
-              userId: comment.user?._id?.toString() || "Unknown",
-              username: comment.user?.username || "Anonymous",
-              text: comment.text,
-              createdAt: comment.createdAt?.toISOString?.() || null,
-            })) || [],
+         
+           
+            
+        comments: post.comments?.map((comment: {
+            _id: mongoose.Types.ObjectId | string;
+            user: mongoose.Types.ObjectId | string | IUser;
+            text: string;
+            createdAt: Date;
+          }) => ({
+            _id: comment._id.toString(),
+            userId:
+              comment.user && typeof comment.user === 'object' && '_id' in comment.user
+                ? comment.user._id.toString()
+                : comment.user?.toString() || 'Unknown', // Add null or undefined check here
+            text: comment.text,
+            username:
+              comment.user && typeof comment.user === 'object' && 'username' in comment.user
+                ? comment.user.username
+                : 'Unknown',
+            createdAt: comment.createdAt?.toISOString?.() || '',
+          })) || [],
+
         }));
 
       return {
-        _id: user._id.toString(),
+        _id: (user._id as string).toString(),
         name: user.name || "Unknown",
         email: user.email || "Unknown",
         role: user.role || "Unknown",
@@ -348,7 +371,7 @@ export async function getUsers(){
   }
 }
 
-export async function createPost(prevState:any , formData:FormData){
+export async function createPost(prevState:unknown , formData:FormData){
   const session = await getUserSession();
   if (!session) {
     return { error: "Unauthorized: Please log in to create a post." };
@@ -357,6 +380,7 @@ export async function createPost(prevState:any , formData:FormData){
   if (!(formData instanceof FormData)) {
     return { error: "Invalid form submission" };
   }
+  console.log(prevState);
 
 
 const youtubeCode = formData.get("youtubecode")?.toString().trim();
@@ -380,7 +404,7 @@ const userId = formData.get("userId")?.toString().trim();
 try{
    const response = await axios.get(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${newURL}&key=${process.env.YOUTUBE_API_KEY}`)
   
-   console.log(response);
+ 
 
    if(!response.data.items.length){
     return { error: "YouTube video not found. Please check the URL." };
@@ -390,7 +414,6 @@ try{
    const title = videoData.title;
    const description = videoData.description;
 
-    // Thumbnail URL Generation
     const thumbnailURL = `https://img.youtube.com/vi/${newURL}/maxresdefault.jpg`;
 
 
@@ -417,19 +440,18 @@ catch(error){
 
 export async function logoutUser() {
   try {
-      console.log("Clearing session...");
+    
      const cookieStore = await  cookies();
      
      cookieStore.set("session", "", { 
         httpOnly: true, 
         secure: process.env.NODE_ENV === "production",
-        expires: new Date(0), // Expire immediately
+        expires: new Date(0), 
         path:"/"
        
         
      });
    
-     console.log("Session successfully removed.");
      return { success: true, redirect: "/login" };
   } catch (error) {
      console.error("Logout error:", error);
@@ -437,121 +459,176 @@ export async function logoutUser() {
   }
 }
 
-
-
-export async function getNewPosts() {
+export async function getNewPosts(): Promise<{ posts: Postss[] }> {
   try {
-    // await connect();
-
     const allposts = await Post.find().sort({ createdAt: -1 }).lean();
     if (!allposts || allposts.length === 0) {
-      console.log("No posts found");
+      
       return { posts: [] };
     }
-    
     const formattedPosts = allposts.map(post => ({
-      _id: post._id.toString(),
+      _id: (post._id as string).toString(),
       userId: post.userId?._id?.toString() || post.userId.toString(),
-      title:post.title?.title?.toString()||post.title.toString(),
+      title: post.title?.title?.toString() || post.title.toString(),
       username: post.userId?.username || "Unknown",
       createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
       updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
-      description: post.description
-        ? post.description.replace(/<[^>]*>/g, '').replace(/\{[^}]*\}/g, '')
-        : "",
-      thumbnail: post.thumbnail || (post.youtubeCode 
-        ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg` 
-        : null),
-      readBy: Array.isArray(post.readBy) ? post.readBy.map(id => id.toString()) : [], // Ensure IDs are strings
-      likes: post.likes ? post.likes.map((like) => like.userId?.toString?.() || like.toString()) : [],
-      dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString()) : [],
-      comments: post.comments
-        ?.map((comment) => ({
-          _id: comment._id.toString(),
-          userId: comment.user?._id?.toString() || "Unknown",
-          username: comment.user?.username || "Anonymous",
-          text: comment.text,
-          createdAt: comment.createdAt?.toISOString?.() || null,
-        })) || [],
+      description: post.description ? post.description.replace(/<[^>]*>/g, '').replace(/\{[^}]*\}/g, '') : "",
+      thumbnail: post.thumbnail || (post.youtubeCode ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg` : null),
+      readBy: Array.isArray(post.readBy) ? post.readBy.map(id => id.toString()) : [],
+      likes: post.likes ? post.likes.map((like: { userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString()) : [],
+      dislikes: post.dislikes ? post.dislikes.map((dislike: { userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString()) : [],
+      
+      comments: post.comments?.map((comment: {
+        _id: mongoose.Types.ObjectId | string;
+        user: mongoose.Types.ObjectId | string | IUser | undefined;
+        text: string;
+        createdAt: Date;
+      }) => ({
+        _id: comment._id.toString(),
+      
+        userId:
+        comment.user && typeof comment.user === 'object' && '_id' in comment.user
+          ? comment.user._id.toString()
+          : typeof comment.user === 'string'
+            ? comment.user
+            : 'Unknown',
+        text: comment.text,
+        username: typeof comment.user === 'object' && 'username' in comment.user
+          ? comment.user.username
+          : 'Unknown',
+        createdAt: comment.createdAt?.toISOString?.() || '',
+      })) || [],
+      
     }));
 
-    
-    return formattedPosts;
-
+    return { posts: formattedPosts };
   } catch (error) {
     console.log("Error fetching posts:", error);
-    // return { posts: [], error: "Failed to fetch posts" };
-    return [];
+    return { posts: [] };
   }
 }
 
+type FormattedPost = {
+  _id: string;
+  title: string;
+  userId: string | mongoose.Types.ObjectId;
+  createdAt: string | null;
+  updatedAt: string | null;
+  likes: string[];
+  dislikes: string[];
+  readBy: string[];
+  description: string;
+  youtubeCode: string;
+  thumbnail?: string;
+  comments: {
+    _id: string;
+    user: {
+      _id: string;
+      name: string;
+    };
+    text: string;
+    createdAt: string | null;
+  }[];
+};
 
-export async function getSpecificPosts(postid?: string, userId?: string) {
+interface PopulatedComment {
+  _id: string;
+  user: {
+    _id: string;
+    name: string;
+  };
+  text: string;
+  createdAt: string | null;
+}
+
+
+
+export async function getSpecificPosts(
+  postid?: string,
+  userId?: string
+): Promise<FormattedPost | { error: string }> {
   try {
-    console.log("Fetching post with:", { postid, userId }); // Debugging log
+    // console.log("Fetching post with:", { postid, userId });
 
-    // await connect();
-
-    // Validate postid and userId are provided
     if (!postid || !userId) {
-      console.log("Error: Post ID and User ID are required", { postid, userId });
       return { error: "Post ID and User ID are required" };
     }
 
-    // Validate postid format
     if (!postid.match(/^[0-9a-fA-F]{24}$/)) {
-      console.log("Error: Invalid Post ID format", postid);
       return { error: "Invalid Post ID format" };
     }
-    const objectId = new mongoose.Types.ObjectId(postid);
 
-    // Validate userId format
     if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
-      console.log("Error: Invalid User ID format", userId);
       return { error: "Invalid User ID format" };
     }
+
+    const postObjectId = new mongoose.Types.ObjectId(postid);
     const userObjectId = new mongoose.Types.ObjectId(userId);
 
-    // Fetch post with populated userId
-    console.log("Searching for Post ID:", postid);
-    let requiredPost = await Post.findById(objectId).populate("userId").populate("comments.user").lean();
-   
+    const post = await Post.findById(postObjectId)
+      .populate("userId", "_id name")
+      .populate("comments.userId", "_id name")
+      .lean<IPost>();
 
-    if (!requiredPost) {
-      console.log("No post found for given ID:", postid);
+    if (!post) {
       return { error: "Post not found" };
     }
 
-    // Update readBy efficiently
     await Post.updateOne(
-      { _id: objectId },
+      { _id: postObjectId },
       { $addToSet: { readBy: userObjectId } }
     );
 
-    // Format post data
-    const formattedPost = {
-      ...requiredPost,
-      _id: requiredPost._id?.toString(),
-      title: requiredPost.title ? requiredPost.title.toString():"",
-      userId: (requiredPost.userId?._id?.toString() || requiredPost.userId?.toString()) ?? "",
+    const formattedPost: FormattedPost = {
+      _id: post._id.toString(),
+      title: post.title || "",
+      userId: (post.userId as mongoose.Types.ObjectId | { _id: string })._id.toString(),
+      createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
+      updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
+      likes: post.likes?.map(like =>
+        typeof like.userId === "object"
+          ? like.userId._id?.toString?.() || ""
+          : like.userId?.toString?.() || ""
+      ) || [],
+      dislikes: post.dislikes?.map(dislike =>
+        typeof dislike.userId === "object"
+          ? dislike.userId._id?.toString?.() || ""
+          : dislike.userId?.toString?.() || ""
+      ) || [],
+      readBy: post.readBy?.map(id =>
+        typeof id === "object" ? id._id?.toString?.() || "" : id?.toString?.() || ""
+      ) || [],
+      description: post.description || "",
+      youtubeCode: post.youtubeCode || "",
+      thumbnail: post.thumbnail,
+      comments: (post.comments || []).map(comment => {
+  const user = comment.user;
+  const userId =
+    typeof user === "object" && user !== null && "_id" in user
+      ? user._id.toString()
+      : typeof user === "string"
+        ? user
+        : "Unknown";
 
-      createdAt: requiredPost.createdAt ? new Date(requiredPost.createdAt).toISOString() : null,
-      updatedAt: requiredPost.updatedAt ? new Date(requiredPost.updatedAt).toISOString() : null,
-      likes: requiredPost.likes?.map((like: mongoose.Types.ObjectId) => like.toString()) || [],
-      dislikes: requiredPost.dislikes?.map((dislike: mongoose.Types.ObjectId) => dislike.toString()) || [],
-      readBy: requiredPost.readBy?.map((id: mongoose.Types.ObjectId) => id.toString()) || [],
-      comments: requiredPost.comments?.map((comment: any) => ({
-        _id: comment._id?.toString(),
-        user: {
-          _id: comment.user?._id?.toString() || "",
-          name: comment.user?.name || "Anonymous",
-        },
-        text: comment.text || "",
-        createdAt: comment.createdAt ? new Date(comment.createdAt).toISOString() : null,
-      })) || [],
+  const userName =
+    typeof user === "object" && user !== null && "name" in user
+      ? user.name
+      : "Anonymous";
+
+  return {
+    _id: comment._id.toString(),
+    user: {
+      _id: userId,
+      name: userName,
+    },
+    text: comment.text || "",
+    createdAt: comment.createdAt ? new Date(comment.createdAt).toISOString() : null,
+  };
+}) as PopulatedComment[]
+
     };
 
-   
     return formattedPost;
   } catch (error) {
     console.error("Error fetching post:", error);
@@ -560,18 +637,19 @@ export async function getSpecificPosts(postid?: string, userId?: string) {
 }
 
 
+
 export async function incrementLikes(postId: string) {
   try {
     // await connect();
     const session = await getUserSession();
 
     if (!session) {
-      console.log("The user is not logged in");
+     
       return { error: "Unauthorized: Please log in to like posts." };
     }
 
     if (!postId) {
-      console.error("postId is missing");
+    
       return null;
     }
 
@@ -583,35 +661,32 @@ export async function incrementLikes(postId: string) {
 
 
 
-    let post = await Post.findById(postId);
+    const post = await Post.findById(postId);
     if (!post) {
-      console.log("No post found to be liked");
+      
       return null;
     }
 
-    // Ensure likes array exists
+   
     if (!Array.isArray(post.likes)) {
-      console.log("Likes array is undefined or not an array, initializing...");
+     
       post.likes = [];
     }
 
-  
-
-    // Check if user already liked the post
-    if (post.likes.some((like: any) => like.userId?.toString() === userId)) {
-      console.log("User has already liked the post");
+ 
+    if (post.likes.some((like: { userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString() === userId)) {
+      
       return { likes: post.likes.length, dislikes: post.dislikes.length };
     }
 
-    // Remove user from dislikes if they previously disliked the post
-    if (post.dislikes.some((dislike: any) => dislike.userId?.toString() === userId)) {
-      post.dislikes = post.dislikes.filter((dislike: any) => dislike.userId?.toString() !== userId);
+    
+    if (post.dislikes.some((dislike: { userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString() === userId)) {
+      post.dislikes = post.dislikes.filter((dislike:{ userId: mongoose.Types.ObjectId | string | IUser } ) => dislike.userId?.toString() !== userId);
       console.log("User removed from dislikes");
     }
 
     post.likes.push({ userId: new mongoose.Types.ObjectId(userId), createdAt: new Date() });
 
-    console.log("User liked the post");
 
     await post.save();
    
@@ -629,12 +704,12 @@ export async function decrementLikes(postId: string) {
     const session = await getUserSession();
 
     if (!session) {
-      console.log("The user is not logged in");
+      
       return { error: "Unauthorized: Please log in to dislike posts." };
     }
 
     if (!postId) {
-      console.error("postId is missing");
+      
       return null;
     }
 
@@ -646,35 +721,32 @@ export async function decrementLikes(postId: string) {
 
  
 
-    let post = await Post.findById(postId);
+    const post = await Post.findById(postId);
     if (!post) {
       console.log("No post found to be disliked");
       return null;
     }
 
-    // Ensure likes and dislikes arrays exist
+    
     if (!Array.isArray(post.likes)) {
-      console.log("Likes array is undefined or not an array, initializing...");
+     
       post.likes = [];
     }
     if (!Array.isArray(post.dislikes)) {
-      console.log("Dislikes array is undefined or not an array, initializing...");
+      
       post.dislikes = [];
     }
 
-    console.log("Likes before click:", post.likes.length);
-
-    // Check if user already disliked the post
-    if (post.dislikes.some((dislike: any) => dislike.userId?.toString() === userId)) {
-      console.log("User has already disliked the post");
+  
+    if (post.dislikes.some((dislike: { userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString() === userId)) {
+      
       return { likes: post.likes.length, dislikes: post.dislikes.length };
     }
 
-    // Remove user from likes if they previously liked the post
-    post.likes = post.likes.filter((like: any) => like.userId?.toString() !== userId);
+    post.likes = post.likes.filter((like: { userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString() !== userId);
     post.dislikes.push({ userId: new mongoose.Types.ObjectId(userId), createdAt: new Date() });
 
-    console.log("User disliked the post");
+    
 
     await post.save();
    
@@ -691,11 +763,8 @@ export async function decrementLikes(postId: string) {
 
 export async function getUserPosts(userId:string) {
   try{
-    //  await connect();
+   
 
-     console.log("Backend received userId:", userId);
-
-    
      const posts = await Post.find({userId}).sort({createdAt:-1}).lean();
      return JSON.parse(JSON.stringify(posts));
   
@@ -708,20 +777,19 @@ export async function getUserPosts(userId:string) {
 }
 
 export async function getUserDetails(userId:string){
-  // await  connect();
+  
   try{
- 
-    console.log("Backend received userId:", userId);
+    
 
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      console.log("Invalid userId:", userId);
+      
       return null;
     }
     
-    // const user = await User.findOne({ _id: new mongoose.Types.ObjectId(userId)})
+   
     const user = await User.findOne({ _id: userId })
     .select("name email _id role")
-    .lean();
+    .lean<IUserLean>();
 
     if (!user) {
       console.log("User not found.");
@@ -730,10 +798,9 @@ export async function getUserDetails(userId:string){
 
     return {
       _id: user._id.toString(), // Convert ObjectId to string
-      username: user.username,
+      username: user.name,
       email: user.email,
       role:user.role,
-    
     };
   }
   catch (error) {
@@ -742,7 +809,7 @@ export async function getUserDetails(userId:string){
 }
 }
 
-export async function updatePost(postId:any,updatedData:{title:any,description:any}){
+export async function updatePost(postId:string,updatedData:{title:string,description:string}){
   try{
   // await connect();
 
@@ -767,7 +834,7 @@ export async function DeletePost(postId: string) {
       };
     }
 
-    // Fetch the post to check ownership
+   
     const post = await Post.findById(postId);
     if (!post) {
       return {
@@ -776,7 +843,6 @@ export async function DeletePost(postId: string) {
       };
     }
 
-    // Allow only admin or post creator to delete
     if (user.role !== 'admin' && String(post.userId) !== String(user.id)) {
       return {
         success: false,
@@ -802,7 +868,7 @@ export async function DeletePost(postId: string) {
 export default async function DeleteUser(userId:string){
 try{
     
-  const user = getUserSession();
+  const user = await getUserSession();
   if(!user){
     return {
       success:false,
@@ -818,7 +884,7 @@ try{
   else{
     return {success:false,message:"Unauthorized: You don't have permission to delete this user."};
   }
-    console.log("UserId deleted successfully by Admin:", deletedUser);
+    
     return {success:true,message:"Admin deleted UserId successfully"};
 
 }
@@ -834,12 +900,12 @@ export async function updatedUserLastSeen(userId: string) {
     // await connect();
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { lastSeenAt: new Date() },  // Correct field name
+      { lastSeenAt: new Date() }, 
       { new: true }
-    ).lean();  // Call lean() as a function
-    console.log("Updated lastSeenAt:", updatedUser?.lastSeenAt);
+    ).lean<UserType>();  
+  
     return updatedUser;
-  } catch (error: any) {
+  } catch (error:unknown) {
     console.error("Error updating user's lastSeenAt:", error);
     return null;
   }
@@ -847,20 +913,17 @@ export async function updatedUserLastSeen(userId: string) {
 
 export async function getUnreadPostsCount(){
   try{
-    // await connect();
-
+    
     const session = await getUserSession();
     if(!session)return {count:0};
 
     const userId = session.id ;
-    console.log("session id to get unread Count:",userId)
-
-        // Count posts that the user hasn't read
+    
     const unreadCount = await Post.countDocuments({ readBy: { $ne: userId } });
     return { count: unreadCount };
 
   }
-  catch(error:any){
+  catch(error:unknown){
     console.error("Error fetching unread posts:", error);
     return { count: 0 };
   }
@@ -868,7 +931,6 @@ export async function getUnreadPostsCount(){
 
 export async function markPostAsRead(postId:string){
   try{
-    //  await connect();
 
      const session = await getUserSession();
      if (!session) return { error: "User not logged in" };
@@ -889,7 +951,7 @@ export async function markPostAsRead(postId:string){
 
     return { success: true };
   }
-  catch(error:any){
+  catch(error:unknown){
     console.error("Error marking post as read:", error);
     return { error: "Failed to mark post as read" };
   }
@@ -909,20 +971,21 @@ const posts = await Post.find({
   createdAt: { $gte: startDate, $lte: endDate }
 })
 .populate("userId")
-
-.sort({createdAt:-1}).lean();
+.sort({createdAt:-1})
+.lean()as unknown as (IPost & { userId: IUser | string })[];
 
     if (!posts || posts.length === 0) {
       console.log("No posts found for this month.");
       return [];
     }
   
-    function formatPosts(posts) {
+
+    function formatPosts(posts: (IPost & { userId: IUser | string })[]): Postss[] {
       return posts.map(post => ({
         _id: post._id.toString(),
-        userId: post.userId?._id?.toString() || post.userId.toString(),
-        title: post.title?.title?.toString() || post.title.toString(),
-        username: post.userId?.username || "Unknown",
+        userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+        title: post.title.toString(),
+        username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
         createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
         updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
         description: post.description
@@ -931,57 +994,66 @@ const posts = await Post.find({
         thumbnail: post.thumbnail || (post.youtubeCode
           ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
           : null),
-        readBy: post.readBy?.map((id) => id.toString()) || [],
-        likes: post.likes ? post.likes.map((like) => like.userId?.toString?.() || like.toString()) : [],
-        dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString()) : [],
-        comments: post.comments
-          ?.map((comment) => ({
-            _id: comment._id.toString(),
-            userId: comment.user?._id?.toString() || "Unknown",
-            username: comment.user?.username || "Anonymous",
-            text: comment.text,
-            createdAt: comment.createdAt?.toISOString?.() || null,
-          })) || [],
+        readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+        likes: post.likes?.map(like =>
+          typeof like.userId === "string"
+            ? like.userId
+            : (like.userId as IUser)._id?.toString?.() || ""
+        ) || [],
+        dislikes: post.dislikes?.map(dislike =>
+          typeof dislike.userId === "string"
+            ? dislike.userId
+            : (dislike.userId as IUser)._id?.toString?.() || ""
+        ) || [],
+        comments: post.comments?.map(comment => ({
+          _id: comment._id.toString(),
+          userId: typeof comment.user === "string"
+            ? comment.user
+            : (comment.user as IUser)._id.toString(),
+          text: comment.text,
+          username: typeof comment.user === "string"
+            ? "Anonymous"
+            : (comment.user as IUser)?.name || "Anonymous",
+          createdAt: comment.createdAt?.toISOString?.() || "",
+        })) || [],
       }));
     }
     
-  
-    console.log("Formatted posts for this month:", formatPosts);
-      return formatPosts(posts);
+    return formatPosts(posts);
  }
- catch(error:any){
+ catch(error){
      console.log("Error in fetching the posts of today:",error);
      return [];
  }
 }
 
-export async function getPopularPostsByToday(){
-  // await connect();
- try{
-  const startDate = new Date();
-  startDate.setHours(0, 0, 0, 0); // Start of today (midnight)
+export async function getPopularPostsByToday(): Promise<Postss[]> {
+  try {
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0); // Start of today (midnight)
 
-  const endDate = new Date();
-  endDate.setHours(23, 59, 59, 999); // End of today (11:59:59 PM)
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999); // End of today (11:59:59 PM)
 
- 
-const posts = await Post.find({
-  createdAt: { $gte: startDate, $lte: endDate }
-})
-.populate("userId")
-.sort({likes:-1}).lean();
+    const posts = await Post.find({
+      createdAt: { $gte: startDate, $lte: endDate },
+    })
+      .populate("userId")
+      .sort({ likes: -1 })
+      .lean() as unknown as (IPost & { userId: IUser | string })[];;
 
     if (!posts || posts.length === 0) {
-      console.log("No posts found for this month.");
+      console.log("No posts found for today.");
       return [];
     }
-  
-    function formatPosts(posts) {
+   
+    function formatPosts(posts:(IPost & { userId: IUser | string })[]): Postss[] {
       return posts.map(post => ({
+      
         _id: post._id.toString(),
-        userId: post.userId?._id?.toString() || post.userId.toString(),
-        title: post.title?.title?.toString() || post.title.toString(),
-        username: post.userId?.username || "Unknown",
+        userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+        title: post.title.toString(),
+        username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
         createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
         updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
         description: post.description
@@ -990,29 +1062,37 @@ const posts = await Post.find({
         thumbnail: post.thumbnail || (post.youtubeCode
           ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
           : null),
-        readBy: post.readBy?.map((id) => id.toString()) || [],
-        likes: post.likes ? post.likes.map((like) => like.userId?.toString?.() || like.toString()) : [],
-        dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString()) : [],
-        comments: post.comments
-          ?.map((comment) => ({
-            _id: comment._id.toString(),
-            userId: comment.user?._id?.toString() || "Unknown",
-            username: comment.user?.username || "Anonymous",
-            text: comment.text,
-            createdAt: comment.createdAt?.toISOString?.() || null,
-          })) || [],
+          readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+        likes: post.likes
+          ? post.likes.map((like:  { userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString())
+          : [],
+        dislikes: post.dislikes
+          ? post.dislikes.map((dislike:  { userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString())
+          : [],
+     
+        comments: post.comments?.map(comment => ({
+          _id: comment._id.toString(),
+          userId: typeof comment.user === "string"
+            ? comment.user
+            : (comment.user as IUser)._id.toString(),
+          text: comment.text,
+          username: typeof comment.user === "string"
+            ? "Anonymous"
+            : (comment.user as IUser)?.name || "Anonymous",
+          createdAt: comment.createdAt?.toISOString?.() || "",
+        })) || [],
       }));
     }
     
-  
-    console.log("Formatted posts for this month:", formatPosts);
-      return formatPosts(posts);
- }
- catch(error:any){
-     console.log("Error in fetching the posts of today:",error);
-     return [];
- }
+   
+  return formatPosts(posts);
+  }
+  catch(error){
+    console.log("Error fetching posts",error);
+    return [];
+  }
 }
+
 export async function getPostsByYesterday(){
   // await connect();
   try{
@@ -1028,19 +1108,22 @@ const posts = await Post.find({
   createdAt: { $gte: startDate, $lte: endDate }
 })
 .populate("userId")
-.sort({createdAt:-1}).lean();
+.sort({createdAt:-1}).lean() as unknown as (IPost & { userId: IUser | string })[];
 
 if (!posts || posts.length === 0) {
   console.log("No posts found for this month.");
   return [];
 }
 
-function formatPosts(posts) {
+
+function formatPosts(posts:(IPost & { userId: IUser | string })[]): Postss[] {
   return posts.map(post => ({
     _id: post._id.toString(),
-    userId: post.userId?._id?.toString() || post.userId.toString(),
-    title: post.title?.title?.toString() || post.title.toString(),
-    username: post.userId?.username || "Unknown",
+    userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+    title: post.title.toString(),
+    
+ 
+    readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
     createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
     updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
     description: post.description
@@ -1049,22 +1132,28 @@ function formatPosts(posts) {
     thumbnail: post.thumbnail || (post.youtubeCode
       ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
       : null),
-    readBy: post.readBy?.map((id) => id.toString()) || [],
-    likes: post.likes ? post.likes.map((like) => like.userId?.toString?.() || like.toString()) : [],
-    dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString()) : [],
-    comments: post.comments
-      ?.map((comment) => ({
-        _id: comment._id.toString(),
-        userId: comment.user?._id?.toString() || "Unknown",
-        username: comment.user?.username || "Anonymous",
-        text: comment.text,
-        createdAt: comment.createdAt?.toISOString?.() || null,
-      })) || [],
+    
+    username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
+    likes: post.likes ? post.likes.map((like:  { userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString()) : [],
+    dislikes: post.dislikes ? post.dislikes.map((dislike:  { userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString()) : [],
+    comments: post.comments?.map(comment => ({
+      _id: comment._id.toString(),
+      userId:
+  typeof comment.user === "string"
+    ? comment.user
+    : comment.user && "_id" in comment.user
+      ? comment.user._id.toString()
+      : "unknown",
+
+      text: comment.text,
+      username: typeof comment.user === "string"
+        ? "Anonymous"
+        : (comment.user as IUser)?.name || "Anonymous",
+      createdAt: comment.createdAt?.toISOString?.() || "",
+    })) || [],
   }));
 }
 
-
-console.log("Formatted posts for this month:", formatPosts);
   return formatPosts(posts);
   }
   catch(error){
@@ -1074,33 +1163,34 @@ console.log("Formatted posts for this month:", formatPosts);
 }
 
 export async function getPopularPostsByYesterday(){
-  // await connect();
+
   try{
    const  startDate = new Date();
-   startDate.setDate(startDate.getDate() - 1); // Go to yesterday
-startDate.setHours(0, 0, 0, 0); // Midnight of yesterday
+   startDate.setDate(startDate.getDate() - 1); 
+startDate.setHours(0, 0, 0, 0);
 
 const endDate = new Date();
-endDate.setDate(endDate.getDate() - 1); // Go to yesterday
-endDate.setHours(23, 59, 59, 999); // 11:59:59 PM of yesterday
+endDate.setDate(endDate.getDate() - 1);
+endDate.setHours(23, 59, 59, 999);
 
 const posts = await Post.find({
   createdAt: { $gte: startDate, $lte: endDate }
 })
 .populate("userId")
-.sort({likes:-1}).lean();
+.sort({likes:-1}).lean() as unknown as (IPost & { userId: IUser | string })[];
 
 if (!posts || posts.length === 0) {
   console.log("No posts found for this month.");
   return [];
 }
 
-function formatPosts(posts) {
+function formatPosts(posts:(IPost & { userId: IUser | string })[]): Postss[] {
   return posts.map(post => ({
+    
     _id: post._id.toString(),
-    userId: post.userId?._id?.toString() || post.userId.toString(),
-    title: post.title?.title?.toString() || post.title.toString(),
-    username: post.userId?.username || "Unknown",
+    userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+    title: post.title.toString(),
+    username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
     createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
     updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
     description: post.description
@@ -1109,22 +1199,25 @@ function formatPosts(posts) {
     thumbnail: post.thumbnail || (post.youtubeCode
       ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
       : null),
-    readBy: post.readBy?.map((id) => id.toString()) || [],
-    likes: post.likes ? post.likes.map((like) => like.userId?.toString?.() || like.toString()) : [],
-    dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString()) : [],
-    comments: post.comments
-      ?.map((comment) => ({
-        _id: comment._id.toString(),
-        userId: comment.user?._id?.toString() || "Unknown",
-        username: comment.user?.username || "Anonymous",
-        text: comment.text,
-        createdAt: comment.createdAt?.toISOString?.() || null,
-      })) || [],
+      readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+   
+    likes: post.likes ? post.likes.map((like:{ userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString()) : [],
+    dislikes: post.dislikes ? post.dislikes.map((dislike:{ userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString()) : [],
+    
+    comments: post.comments?.map(comment => ({
+      _id: comment._id.toString(),
+      userId: typeof comment.user === "string"
+        ? comment.user
+        : (comment.user as IUser)._id.toString(),
+      text: comment.text,
+      username: typeof comment.user === "string"
+        ? "Anonymous"
+        : (comment.user as IUser)?.name || "Anonymous",
+      createdAt: comment.createdAt?.toISOString?.() || "",
+    })) || [],
   }));
 }
 
-
-console.log("Formatted posts for this month:", formatPosts);
   return formatPosts(posts);
   }
   catch(error){
@@ -1134,7 +1227,7 @@ console.log("Formatted posts for this month:", formatPosts);
 }
 
 export async function getPostsByWeek(){
-  // await connect();
+  
 try{
   const startOfWeek = new Date();
   startOfWeek.setDate(startOfWeek.getDate()-startOfWeek.getDay()+1);
@@ -1149,18 +1242,19 @@ try{
   })
   .populate("userId")
   .sort({createdAt:-1})
-  .lean();
+  .lean()as unknown as (IPost & { userId: IUser | string })[];
   if (!posts || posts.length === 0) {
     console.log("No posts found for this month.");
     return [];
   }
 
-  function formatPosts(posts) {
+  function formatPosts(posts:(IPost & { userId: IUser | string })[]): Postss[] {
     return posts.map(post => ({
+      
       _id: post._id.toString(),
-      userId: post.userId?._id?.toString() || post.userId.toString(),
-      title: post.title?.title?.toString() || post.title.toString(),
-      username: post.userId?.username || "Unknown",
+    userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+    title: post.title.toString(),
+    username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
       createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
       updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
       description: post.description
@@ -1169,25 +1263,32 @@ try{
       thumbnail: post.thumbnail || (post.youtubeCode
         ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
         : null),
-      readBy: post.readBy?.map((id) => id.toString()) || [],
-      likes: post.likes ? post.likes.map((like) => like.userId?.toString?.() || like.toString()) : [],
-      dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString()) : [],
-      comments: post.comments
-        ?.map((comment) => ({
-          _id: comment._id.toString(),
-          userId: comment.user?._id?.toString() || "Unknown",
-          username: comment.user?.username || "Anonymous",
-          text: comment.text,
-          createdAt: comment.createdAt?.toISOString?.() || null,
-        })) || [],
+      // readBy: post.readBy?.map((id:any) => id.toString()) || [],
+      readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+      likes: post.likes ? post.likes.map((like:{ userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString()) : [],
+      dislikes: post.dislikes ? post.dislikes.map((dislike:{ userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString()) : [],
+     
+      comments: post.comments?.map(comment => ({
+        _id: comment._id.toString(),
+        userId: typeof comment.user === "string"
+  ? comment.user
+  : comment.user && (comment.user as IUser)._id
+    ? (comment.user as IUser)._id.toString()
+    : "UnknownUser",
+text: comment.text,
+
+       
+        username: typeof comment.user === "string"
+          ? "Anonymous"
+          : (comment.user as IUser)?.name || "Anonymous",
+        createdAt: comment.createdAt?.toISOString?.() || "",
+      })) || [],
     }));
   }
   
-
-  console.log("Formatted posts for this month:", formatPosts);
     return formatPosts(posts);
 }
-catch(error:any){
+catch(error){
   console.log("Errors while fetching the data from the backend for month: ",error);
   return [];
 }
@@ -1196,7 +1297,7 @@ catch(error:any){
 
 
 export async function getPopularPostsByWeek(){
-  // await connect();
+ 
 try{
   const startOfWeek = new Date();
   startOfWeek.setDate(startOfWeek.getDate()-startOfWeek.getDay()+1);
@@ -1211,18 +1312,20 @@ try{
   })
   .populate("userId")
   .sort({likes:-1})
-  .lean();
+  .lean()as unknown as (IPost & { userId: IUser | string })[];
   if (!posts || posts.length === 0) {
     console.log("No posts found for this month.");
     return [];
   }
 
-  function formatPosts(posts) {
+  function formatPosts(posts:(IPost & { userId: IUser | string })[]): Postss[] {
     return posts.map(post => ({
       _id: post._id.toString(),
-      userId: post.userId?._id?.toString() || post.userId.toString(),
-      title: post.title?.title?.toString() || post.title.toString(),
-      username: post.userId?.username || "Unknown",
+      userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+      title: post.title.toString(),
+      username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
+      
+    
       createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
       updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
       description: post.description
@@ -1231,25 +1334,28 @@ try{
       thumbnail: post.thumbnail || (post.youtubeCode
         ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
         : null),
-      readBy: post.readBy?.map((id) => id.toString()) || [],
-      likes: post.likes ? post.likes.map((like) => like.userId?.toString?.() || like.toString()) : [],
-      dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString()) : [],
-      comments: post.comments
-        ?.map((comment) => ({
-          _id: comment._id.toString(),
-          userId: comment.user?._id?.toString() || "Unknown",
-          username: comment.user?.username || "Anonymous",
-          text: comment.text,
-          createdAt: comment.createdAt?.toISOString?.() || null,
-        })) || [],
+     
+      readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+      likes: post.likes ? post.likes.map((like:{ userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString()) : [],
+      dislikes: post.dislikes ? post.dislikes.map((dislike:{ userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString()) : [],
+     
+      comments: post.comments?.map(comment => ({
+        _id: comment._id.toString(),
+        userId: typeof comment.user === "string"
+          ? comment.user
+          : (comment.user as IUser)._id.toString(),
+        text: comment.text,
+        username: typeof comment.user === "string"
+          ? "Anonymous"
+          : (comment.user as IUser)?.name || "Anonymous",
+        createdAt: comment.createdAt?.toISOString?.() || "",
+      })) || [],
     }));
   }
   
-
-  console.log("Formatted posts for this month:", formatPosts);
     return formatPosts(posts);
 }
-catch(error:any){
+catch(error){
   console.log("Errors while fetching the data from the backend for month: ",error);
   return [];
 }
@@ -1257,10 +1363,10 @@ catch(error:any){
 }
 
 export async function getPostsByMonth(){
-// await connect();
+
 try{
   const startOfMonth = new Date();
-  startOfMonth.setDate(1);// Set to the first day of the month
+  startOfMonth.setDate(1);
   startOfMonth.setHours(0,0,0,0);
 
   const endOfMonth = new Date();
@@ -1272,21 +1378,21 @@ try{
     createdAt: { $gte: startOfMonth, $lte: endOfMonth },
   }).populate("userId")
   .sort({ likes: -1 })
-  .lean();
-
-  
+  .lean() as unknown as (IPost & { userId: IUser | string })[];
 
   if (!posts || posts.length === 0) {
-    console.log("No posts found for this month.");
+    
     return [];
   }
 
-  function formatPosts(posts) {
+  
+  function formatPosts(posts:(IPost & { userId: IUser | string })[]): Postss[] {
     return posts.map(post => ({
+
       _id: post._id.toString(),
-      userId: post.userId?._id?.toString() || post.userId.toString(),
-      title: post.title?.title?.toString() || post.title.toString(),
-      username: post.userId?.username || "Unknown",
+      userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+      title: post.title.toString(),
+      username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
       createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
       updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
       description: post.description
@@ -1295,25 +1401,33 @@ try{
       thumbnail: post.thumbnail || (post.youtubeCode
         ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
         : null),
-      readBy: post.readBy?.map((id) => id.toString()) || [],
-      likes: post.likes ? post.likes.map((like) => like.userId?.toString?.() || like.toString()) : [],
-      dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString()) : [],
-      comments: post.comments
-        ?.map((comment) => ({
-          _id: comment._id.toString(),
-          userId: comment.user?._id?.toString() || "Unknown",
-          username: comment.user?.username || "Anonymous",
-          text: comment.text,
-          createdAt: comment.createdAt?.toISOString?.() || null,
-        })) || [],
+   
+      readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+      likes: post.likes ? post.likes.map((like:{ userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString()) : [],
+      dislikes: post.dislikes ? post.dislikes.map((dislike:{ userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString()) : [],
+      
+      comments: post.comments?.map(comment => ({
+        _id: comment._id.toString(),
+        userId: typeof comment.user === "string"
+  ? comment.user
+  : comment.user && comment.user._id
+    ? comment.user._id.toString()
+    : "anonymous",
+       
+        text: comment.text,
+      
+        username: typeof comment.user === "string"
+          ? "Anonymous"
+          : (comment.user as IUser)?.name || "Anonymous",
+        createdAt: comment.createdAt?.toISOString?.() || "",
+      })) || [],
     }));
   }
   
 
-  console.log("Formatted posts for this month:", formatPosts);
     return formatPosts(posts);
 }
-catch(error:any){
+catch(error){
   console.log("Error while fetching the data for the month:",error);
   return [];
 }
@@ -1322,10 +1436,10 @@ catch(error:any){
 
 
 export async function getPopularPostsByMonth(){
-  // await connect();
+ 
   try{
     const startOfMonth = new Date();
-    startOfMonth.setDate(1);// Set to the first day of the month
+    startOfMonth.setDate(1);
     startOfMonth.setHours(0,0,0,0);
   
     const endOfMonth = new Date();
@@ -1337,21 +1451,21 @@ export async function getPopularPostsByMonth(){
       createdAt: { $gte: startOfMonth, $lte: endOfMonth },
     }).populate("userId")
     .sort({ likes: -1 })
-    .lean();
+    .lean() as unknown as (IPost & { userId: IUser | string })[];
   
     
-  
     if (!posts || posts.length === 0) {
       console.log("No posts found for this month.");
       return [];
     }
   
-    function formatPosts(posts) {
+    function formatPosts(posts:(IPost & { userId: IUser | string })[]): Postss[] {
       return posts.map(post => ({
+       
         _id: post._id.toString(),
-        userId: post.userId?._id?.toString() || post.userId.toString(),
-        title: post.title?.title?.toString() || post.title.toString(),
-        username: post.userId?.username || "Unknown",
+        userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+        title: post.title.toString(),
+        username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
         createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
         updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
         description: post.description
@@ -1360,77 +1474,58 @@ export async function getPopularPostsByMonth(){
         thumbnail: post.thumbnail || (post.youtubeCode
           ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
           : null),
-        readBy: post.readBy?.map((id) => id.toString()) || [],
-        likes: post.likes ? post.likes.map((like) => like.userId?.toString?.() || like.toString()) : [],
-        dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString?.() || dislike.toString()) : [],
-        comments: post.comments
-          ?.map((comment) => ({
-            _id: comment._id.toString(),
-            userId: comment.user?._id?.toString() || "Unknown",
-            username: comment.user?.username || "Anonymous",
-            text: comment.text,
-            createdAt: comment.createdAt?.toISOString?.() || null,
-          })) || [],
+          readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+        likes: post.likes ? post.likes.map((like:{ userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString()) : [],
+        dislikes: post.dislikes ? post.dislikes.map((dislike:{ userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString()) : [],
+        
+        comments: post.comments?.map(comment => ({
+          _id: comment._id.toString(),
+          userId: typeof comment.user === "string"
+  ? comment.user
+  : comment.user && (comment.user as IUser)._id
+    ? (comment.user as IUser)._id.toString()
+    : "UnknownUser",
+  
+          text: comment.text,
+          username: typeof comment.user === "string"
+            ? "Anonymous"
+            : (comment.user as IUser)?.name || "Anonymous",
+          createdAt: comment.createdAt?.toISOString?.() || "",
+        })) || [],
       }));
     }
     
-  
-    console.log("Formatted posts for this month:", formatPosts);
       return formatPosts(posts);
   }
-  catch(error:any){
+  catch(error){
     console.log("Error while fetching the data for the month:",error);
     return [];
   }
-  }
+}
 
 export async function getPopularPosts() {
-  try {
-    // await connect();
-
+  try { 
     const allposts = await Post.find()
-    .sort({ likes: -1 })
     .populate('userId')
     .populate('likes.userId')
     .populate('dislikes.userId')
-    .populate('comments.user')
-    .lean();
+    .populate('comments.userId')
+    .sort({ likes: -1 })
+    .lean() as unknown as (IPost & { userId: IUser | string })[];
 
     if (!allposts || allposts.length === 0) {
       console.log("No posts found");
-      // return { posts: [] };
+      
       return [];
     }
-    
-
-
-    // // Helper to map commentUsers into each comment
-    // function attachCommentUsers(post) {
-    //   const userMap = new Map(
-    //     (post.commentUsers || []).map(user => [user._id.toString(), user])
-    //   );
-
-    //   post.comments = (post.comments || []).map(comment => {
-    //     const user = userMap.get(comment.user?.toString());
-    //     return {
-    //       ...comment,
-    //       user: user || null
-    //     };
-    //   });
-
-    //   return post;
-    // }
-
-    
-    function formatPosts(posts) {
+ 
+    function formatPosts(posts:(IPost & { userId: IUser | string })[]): Postss[] {
       return posts.map(post => {
-        // const withMappedComments = attachCommentUsers(post);
-
         return {
           _id: post._id.toString(),
-          userId: post.userId?.toString?.() || "",
-          title: post.title?.toString() || "",
-          username: post.user?.username || "Unknown",
+          userId: typeof post.userId === "string" ? post.userId : post.userId?._id?.toString() || "unknown-user",
+          title: post.title.toString(),
+          username: typeof post.userId === "string" ? "Unknown" : post.userId?.name || "Unknown",
           createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
           updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
           description: post.description
@@ -1439,50 +1534,52 @@ export async function getPopularPosts() {
           thumbnail: post.thumbnail || (post.youtubeCode
             ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
             : null),
-          readBy: post.readBy?.map((id) => id.toString()) || [],
-          likes: post.likes?.map(like => like.userId?._id?.toString?.() || like.userId?.toString?.()) || [],
-          dislikes: post.dislikes?.map(dislike => dislike.userId?._id?.toString?.() || dislike.userId?.toString?.()) || [],
+          readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+          likes: post.likes ? post.likes.map((like:{ userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString?.() || like.toString()) : [],
+          dislikes: post.dislikes ? post.dislikes.map((dislike:{ userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString?.() || dislike.toString()) : [],
           likesCount: post.likes?.length || 0,
           dislikesCount: post.dislikes?.length || 0,
           commentsCount: post.comments?.length || 0,
-          comments: post.comments?.map((comment) => ({
+        
+          comments: post.comments?.map(comment => ({
             _id: comment._id.toString(),
-            userId: comment.user?._id?.toString() || "Unknown",
-            username: comment.user?.username || "Anonymous",
+            userId: typeof comment.user === "string" ? comment.user
+    : comment.user && comment.user._id
+      ? comment.user._id.toString()
+      : "UnknownUser",
+             
             text: comment.text,
-            createdAt: comment.createdAt?.toISOString?.() || null,
+            
+            username: typeof comment.user === "string"
+              ? "Anonymous"
+              : (comment.user as IUser)?.name || "Anonymous",
+            createdAt: comment.createdAt?.toISOString?.() || "",
           })) || [],
+          
         };
       });
     }
-    
-
-  
     return formatPosts(allposts);
-
   } catch (error) {
     console.log("Error fetching posts", error);
     return [];
   }
 }
 
-
-
-export async function getPost(postId:string){
-
-  // await connect();
-  try{
-    const post = await Post.findById(postId).lean();
+export async function getPost(postId: string): Promise<Postss | null> {
+  try {
+    const post = await Post.findById(postId).populate('comments.user', 'name').lean<IPost & { userId: IUser | string }>();
     if(!post){
       console.log("Post not found");
       return null;
     }
 
       const formattedPosts = {
+       
         _id: post._id.toString(),
-        userId: post.userId?._id?.toString() || post.userId.toString(),
-        title:post.title?.title?.toString()||post.title.toString(),
-        username: post.userId?.username || "Unknown",
+        userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+        title: post.title.toString(),
+        username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
         createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
         updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
         description: post.description
@@ -1491,33 +1588,38 @@ export async function getPost(postId:string){
         thumbnail: post.thumbnail || (post.youtubeCode
           ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
           : null),
-          readBy: post.readBy?.map((id) => id.toString()) || [],
-          likes: post.likes ? post.likes.map((like) => like.userId?.toString()) : [],
-          dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString()) : [],
-          comments: post.comments
-            ? post.comments.map((comment) => ({
-                _id: comment._id.toString(),
-                userId: comment.user?._id?.toString() || "Unknown",
-                username: comment.user?.username || "Anonymous",
-                text: comment.text,
-                createdAt: comment.createdAt.toISOString(),
-              }))
-            : [],
+         
+          readBy: (post.readBy ?? []).map(id => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+          likes: post.likes ? post.likes.map((like:{ userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString()) : [],
+          dislikes: post.dislikes ? post.dislikes.map((dislike:{ userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString()) : [],
+         
+          comments: post.comments?.map(comment => ({
+            _id: comment._id.toString(),
+          
+            userId: typeof comment.user === "string"
+  ? comment.user
+  : comment.user && comment.user._id
+    ? comment.user._id.toString()
+    : "Unknown",
+
+            text: comment.text,
+            username: typeof comment.user === "string"
+              ? "Anonymous"
+              : (comment.user as IUser)?.name || "Anonymous",
+            createdAt: comment.createdAt?.toISOString?.() || "",
+          })) || [],
       };
   
-      console.log(`The formattedPosts are:`, formattedPosts);
       return formattedPosts;
   }
-  catch(error:any){
-    console.error(" getPost error:", error.message || error);
+  catch(error){
+     console.error("getPost error:", error);
     throw new Error("Failed to fetch post");
   }
-
 }
 
 export async function getLikedPosts() {
   
-  // await connect();
   try{
 
     const allPosts = await Post.aggregate([
@@ -1534,12 +1636,12 @@ export async function getLikedPosts() {
       return { posts: [] };
     }
 
-    // Convert all objects to plain serializable objects
     const formattedPosts = allPosts.map(post => ({
+     
       _id: post._id.toString(),
-      userId: post.userId?._id?.toString() || post.userId.toString(),
-      title:post.title?.title?.toString()||post.title.toString(),
-      username: post.userId?.username || "Unknown",
+      userId: typeof post.userId === "string" ? post.userId : post.userId._id.toString(),
+      title: post.title.toString(),
+      username: typeof post.userId === "string" ? "Unknown" : post.userId.name || "Unknown",
       createdAt: post.createdAt ? new Date(post.createdAt).toISOString() : null,
       updatedAt: post.updatedAt ? new Date(post.updatedAt).toISOString() : null,
       description: post.description
@@ -1548,46 +1650,67 @@ export async function getLikedPosts() {
       thumbnail: post.thumbnail || (post.youtubeCode
         ? `https://img.youtube.com/vi/${post.youtubeCode}/maxresdefault.jpg`
         : null),
-        readBy: post.readBy?.map((id) => id.toString()) || [],
-        likes: post.likes ? post.likes.map((like) => like.userId?.toString()) : [],
-        dislikes: post.dislikes ? post.dislikes.map((dislike) => dislike.userId?.toString()) : [],
-        comments: post.comments
-          ? post.comments.map((comment) => ({
-              _id: comment._id.toString(),
-              userId: comment.user?._id?.toString() || "Unknown",
-              username: comment.user?.username || "Anonymous",
-              text: comment.text,
-              createdAt: comment.createdAt.toISOString(),
-            }))
-          : [],
+       
+        readBy: (post.readBy ?? []).map((id: string | IUser) => typeof id === "string" ? id : (id as IUser)._id?.toString?.() || ""),
+        likes: post.likes ? post.likes.map((like:{ userId: mongoose.Types.ObjectId | string | IUser }) => like.userId?.toString()) : [],
+        dislikes: post.dislikes ? post.dislikes.map((dislike:{ userId: mongoose.Types.ObjectId | string | IUser }) => dislike.userId?.toString()) : [],
+       
+        comments: post.comments?.map((comment: {
+          _id: mongoose.Types.ObjectId;
+          user: string | IUser;
+          text: string;
+          createdAt: Date;
+        }) => ({
+          _id: comment._id.toString(),
+          userId: typeof comment.user === "string"
+            ? comment.user
+            : (comment.user as IUser)._id.toString(),
+          text: comment.text,
+          username: typeof comment.user === "string"
+            ? "Anonymous"
+            : (comment.user as IUser)?.name || "Anonymous",
+          createdAt: comment.createdAt?.toISOString?.() || "",
+        })) || [],
+        
     }));
 
-    console.log(`The formattedPosts are:`, formattedPosts);
+    
     return formattedPosts;
 
   }
-  catch(error:any){
+  catch(error){
     console.log("Error while fetching post",error);
     throw new Error("Failed to fetch post");
   }
 }
 
-export const addComment = async(postId:string ,userId:string,text:string)=>{
-  try{
-    //  await connect();
 
-     if(!postId || !userId || !text.trim()){
+
+type FullyPopulatedComment = {
+  _id: mongoose.Types.ObjectId;
+  userId: {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+  };
+  text: string;
+  createdAt: Date;
+};
+
+export const addComment = async (postId: string, userId: string, text: string) => {
+  try {
+    if (!postId || !userId || !text.trim()) {
       return { error: "Invalid input data" };
-     }
+    }
 
-     const post = await Post.findById(postId);
-     if (!post) {
-      return{error:"Post not found"};
+    const post = await Post.findById(postId); // ❌ do NOT use lean() here
+
+    if (!post) {
+      return { error: "Post not found" };
     }
 
     const newComment = {
       _id: new mongoose.Types.ObjectId(),
-      user:  new mongoose.Types.ObjectId(userId),
+      userId, // let mongoose handle ObjectId
       text,
       createdAt: new Date(),
     };
@@ -1597,38 +1720,46 @@ export const addComment = async(postId:string ,userId:string,text:string)=>{
     await post.save();
 
     const populatedPost = await Post.findById(postId)
-      .populate('comments.user', 'name') // Only populate name from user
-      .lean();
+      .populate('comments.userId', 'name')
+      .lean<{ comments: FullyPopulatedComment[] }>();
 
-      
-    const populatedComment = populatedPost?.comments?.find(
-      (c: any) => c._id.toString() === newComment._id.toString()
-    );
-    
-
-    if (populatedComment) {
-      populatedComment._id = populatedComment._id.toString();
-      if (populatedComment.user?._id) {
-        populatedComment.user._id = populatedComment.user._id.toString();
-      }
+    if (!populatedPost) {
+      return { error: "Post could not be retrieved after save" };
     }
-    return { 
-      success: true,
-       message: "Comment added",
-        comment: populatedComment 
-      };
-  }
-  catch(error:any){
-    console.error("Error adding comment:", error);
-    return { success: false, message: error.message };
-  }
-}
 
-export async function deleteComment(postId: string, commentId: string, userId: string) {
+    const populatedComment = populatedPost.comments.find(
+      (c) => c._id.toString() === newComment._id.toString()
+    );
+
+    if (!populatedComment) {
+      return { error: "Comment could not be retrieved after save" };
+    }
+
+    return {
+      success: true,
+      message: "Comment added",
+      comment: {
+        _id: populatedComment._id.toString(),
+        userId: populatedComment.userId._id.toString(),
+        text: populatedComment.text,
+        username: populatedComment.userId.name,
+        createdAt: populatedComment.createdAt.toISOString(),
+      },
+    };
+  } catch (error) {
+    console.error("Error adding comment:", error);
+    return { success: false, message: error };
+  }
+};
+
+
+
+
+export async function deleteComment(postId: string, commentId: string, userId: string): Promise<{ success: boolean; message: string }> {
   try {
     const currUser = await getUserSession();
 
-    // Check if the user is logged in
+ 
     if (!currUser|| !currUser.id || !currUser.role) {
       return {
         success: false,
@@ -1636,42 +1767,43 @@ export async function deleteComment(postId: string, commentId: string, userId: s
       };
     }
 
-    // Validate if the postId and commentId are provided
-    if (!postId || !commentId) {
-      return { success: false, message: "Invalid request: Missing post or comment ID." };
+    
+    if (!postId || !commentId || !userId) {
+      return { success: false, message: "Invalid request: Missing post or comment ID or user." };
     }
 
-    // Fetch post metadata to check the post owner
+    
     const postMeta = await getPost(postId); // lightweight version
     if (!postMeta) return { success: false, message: "Post not found" };
 
-    // Ensure both currUser.id and postMeta.userId are strings for comparison
+   
     const currUserId = currUser.id.toString();
     const postOwnerId = postMeta.userId.toString();
 
-    // Fetch the full post document to get comments
-    const postDoc = await Post.findById(postId).populate('comments.user');
+    const postDoc = await Post.findById(postId).populate('comments.userId');
     if (!postDoc) return { success: false, message: "Post not found" };
 
-    // Find the comment in the post document
-    const comment = postDoc.comments.find((c: any) => c._id.toString() === commentId);
+    const comment = postDoc.comments.find(
+      (c: PopulatedComment) => c._id.toString() === commentId
+    );
     if (!comment) return { success: false, message: "Comment not found" };
 
-    // Get the comment author's ID
-    const commentAuthorId = comment.user?._id.toString(); // or comment.author, depending on your schema
+ 
+    const commentAuthorId = comment.userId?._id.toString(); 
     if (!commentAuthorId) {
       return { success: false, message: "Comment author not found." };
     }
-    // Check permissions: admin, post owner, or comment author
+
+  
     const isAdmin = currUser.role === 'admin';
     const isPostOwner = currUserId === postOwnerId;
     const isCommentAuthor = currUserId === commentAuthorId;
 
     console.log(`currUserId: ${currUserId}, postOwnerId: ${postOwnerId}, commentAuthorId: ${commentAuthorId}`);
     if (isAdmin || isPostOwner || isCommentAuthor) {
-      // Proceed to delete the comment
+     
       postDoc.comments = postDoc.comments.filter(
-        (comment: any) => comment._id.toString() !== commentId
+        (c: PopulatedComment) => c._id.toString() !== commentId
       );
 
       await postDoc.save();
@@ -1683,9 +1815,10 @@ export async function deleteComment(postId: string, commentId: string, userId: s
         message: "Unauthorized: You don't have permission to delete this comment.",
       };
     }
-  } catch (error: any) {
+  } catch (error:unknown) {
     console.error("Error deleting comment:", error);
-    return { success: false, message: error.message };
+    const errorMessage = error instanceof Error ? error.message : "Something went wrong";
+    return { success: false, message: errorMessage };
   }
 }
 
@@ -1760,14 +1893,18 @@ return { success: true, message: "User demoted to normal again" };
     return { success: false, message: "Failed to make user normal" };
   }
 }
-interface FormData {
-  userId: string;
+export interface NewUserData {
   name: string;
   email: string;
   password: string;
   role?: string;
 }
-export async function addNewUser(formData:FormData){
+
+export interface UpdateUserData extends NewUserData {
+  userId: string;
+}
+
+export async function addNewUser(formData:NewUserData){
   try{
     const { name, email, password, role = "user" } = formData;
     
@@ -1797,7 +1934,7 @@ export async function addNewUser(formData:FormData){
   }
 }
 
-export async function updateUserInfo(formData: FormData) {
+export async function updateUserInfo(formData:UpdateUserData) {
   try {
     const { userId, name, email, role = "user" } = formData;
 
@@ -1818,7 +1955,7 @@ export async function updateUserInfo(formData: FormData) {
     user.role = role || user.role;
 
     await user.save();
-    // revalidatePath(`/user/${userId}`);
+    
 
     return {
       success: true,

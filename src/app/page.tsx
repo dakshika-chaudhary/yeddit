@@ -12,10 +12,20 @@ import { Box, Button } from "@mui/material";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-export default async function HomePage({ searchParams }: { searchParams: { filter?: string } }) {
-  let filter = searchParams?.filter?.toLowerCase() || "today";
+import { Postss } from "../../types/postTypes"; 
+// Ensure you're importing from the same file
+
+interface HomePageProps {
+  //searchParams: { filter?: string };
+  searchParams: Promise<{ filter?: string }>;
+}
+export const dynamic = 'force-dynamic';
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+
   
-  let posts = [];
+  let filter = (await searchParams)?.filter?.toLowerCase() || "today";
+  let posts: Postss[] = [];
 
   switch (filter) {
     case "today":
@@ -31,42 +41,44 @@ export default async function HomePage({ searchParams }: { searchParams: { filte
       posts = await getPostsByMonth();
       break;
     case "all":
-      posts = await getNewPosts();
+      const newPosts = await getNewPosts();
+      posts = newPosts.posts; 
+      // Make sure this is a Post[] array
       break;
     default:
       posts = await getPostsByToday();
-      filter="today";
+      filter = "today";
       break;
   }
 
-  //to avoid displaying the button in which posts are not available
-  let originalFilter = filter;
+  // To avoid displaying the button if no posts are available, check and update filter
+  const originalFilter = filter;
 
-  if(posts.length === 0){
+  if (posts.length === 0) {
     posts = await getPostsByYesterday();
     if (posts.length > 0) {
       filter = "yesterday";
-  }
-  else{
-    posts = await getPostsByWeek();
-    if (posts.length > 0) {
-      filter = "week";
-  }
-  else {
-    posts = await getPostsByMonth();
-    if (posts.length > 0) {
-      filter="month";
-    }
-    else {
-      posts = await getNewPosts();
-      filter = "all";
-    }
-  }
-}
-  }
-  
+    } else {
+      posts = await getPostsByWeek();
+      if (posts.length > 0) {
+        filter = "week";
+      } else {
+        posts = await getPostsByMonth();
+        if (posts.length > 0) {
+          filter = "month";
+        } else {
+          const newPosts = await getNewPosts();
+          posts = newPosts.posts; 
+          // Make sure this is a Post[] array
+          filter = "all";
 
-  if(originalFilter !== filter){
+        }
+      }
+    }
+  }
+
+  // If the filter was updated, perform a redirect
+  if (originalFilter !== filter) {
     redirect(`/?filter=${filter}`);
   }
 
@@ -74,7 +86,7 @@ export default async function HomePage({ searchParams }: { searchParams: { filte
     <div className="max-w-md mx-auto mt-20 p-10">
       <Box sx={{ p: 4, display: "flex", gap: 2, justifyContent: "center" }}>
         {["Today", "Yesterday", "Week", "Month", "All"].map((option) => {
-          const optionLower = option.toLowerCase(); // Convert for comparison
+          const optionLower = option.toLowerCase(); 
           return (
             <Link key={option} href={`?filter=${optionLower}`} passHref>
               <Button
@@ -91,3 +103,4 @@ export default async function HomePage({ searchParams }: { searchParams: { filte
     </div>
   );
 }
+

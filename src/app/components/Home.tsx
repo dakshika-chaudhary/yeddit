@@ -2,7 +2,7 @@
 import * as React from 'react';
 
 import { useState, useEffect, useRef } from 'react';
-import { styled } from '@mui/material/styles';
+
 import Card from '@mui/material/Card';
 import CardHeader from '@mui/material/CardHeader';
 import { CardContent } from '@mui/material';
@@ -15,40 +15,25 @@ import { getUserSession } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import Container from '@mui/material/Container';
 import Image from 'next/image';
-import Button from '@mui/material/Button';
+
 import Box from '@mui/material/Box';
-import Modal from '@mui/material/Modal';
+
 import { LikeDislikeButtons } from '@/app/components/button';
+import { SessionUser } from '../../../types/postTypes';
+import { Postss } from '../../../types/postTypes';
 
-interface Comment {
-  _id: string;
-  user: string;
-  text: string;
-  createdAt: string;
-}
-
-interface Post {
-  _id: string;
-  title: string;
-  description: string;
-  youtubeCode?: string;
-  likes: string[];
-  dislikes: string[];
-  readBy: string[];
-  comments: Comment[];
-  thumbnail?: string;
-  createdAt: string;
-}
-
-export default function Home({ posts }: { posts: Post[] }) {
-  const [user, setUser] = useState(null);
+export const dynamic = 'force-dynamic';
+export default function Home({ posts=[] }: { posts: Postss[] }) {
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [page, setPage] = useState(1);
   const postsPerPage = 6;
   const router = useRouter();
   const [textColor, setTextColor] = useState('black');
-  const [imageColor, setImageColor] = useState('black');
+  const [imageColor] = useState('black');
   const [open, setOpen] = useState(false);
-  const [popupMessage, setPopupMessage] = useState('');
+  console.log(open)
+  const [PopupMessage, setPopupMessage] = useState('');
+  console.log(PopupMessage)
   const loadMoreRef = useRef(null);
 
   useEffect(() => {
@@ -95,7 +80,7 @@ export default function Home({ posts }: { posts: Post[] }) {
     return () => {
       if (currentRef) observer.unobserve(currentRef);
     };
-  }, [posts.length]);
+  }, [posts]);
   
 
   return (
@@ -103,7 +88,7 @@ export default function Home({ posts }: { posts: Post[] }) {
       <Container maxWidth="lg">
         <h4 className="font-bold mb-4 text-center">Posts</h4>
         <ul className="space-y-16">
-          {posts.length > 0 ? (
+          {(posts?.length ?? 0) > 0 ? (
             posts
               .slice(0, page * postsPerPage)
               .map((post) => (
@@ -112,7 +97,9 @@ export default function Home({ posts }: { posts: Post[] }) {
                     <CardHeader
                       avatar={<Avatar sx={{ bgcolor: red[500] }} />}
                       action={<IconButton><MoreVertIcon /></IconButton>}
-                      subheader={new Date(post.createdAt).toISOString()}
+                     
+                      subheader={post.createdAt ? new Date(post.createdAt).toISOString() : "Date unknown"}
+
                     />
                     <Typography
                       variant="h5"
@@ -197,7 +184,7 @@ export default function Home({ posts }: { posts: Post[] }) {
           )}
         </ul>
 
-        {/*  Infinite scroll trigger div */}
+        
         <div ref={loadMoreRef} style={{ height: 1 }} />
 
        {/* // Optional: Loading message */}
@@ -206,34 +193,7 @@ export default function Home({ posts }: { posts: Post[] }) {
         )}
       </Container>
 
-      {/* Login Modal */}
-      <Modal open={open} onClose={() => setOpen(false)}>
-        <Box sx={{ ...modalStyle }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            {popupMessage}
-          </Typography>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => {
-              router.push('/login');
-              setOpen(false);
-            }}
-          >
-            Log In
-          </Button>
-        </Box>
-      </Modal>
+     
     </div>
   );
 }
-
-const modalStyle = {
-  position: 'absolute' as 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  bgcolor: 'background.paper',
-  boxShadow: 24,
-  p: 4,
-};

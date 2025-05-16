@@ -13,10 +13,14 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
+import { useParams } from 'next/navigation';
+import { SanitizedPostss } from '../../../../../types/postTypes';
 
-
-export default function EditPost({ postId }: { postId: string }) {
-  const [post, setPost] = useState<any>(null);
+export const dynamic = 'force-dynamic';
+export default function EditPost() {
+  // { postId }: { postId: string }
+  const { postId } = useParams() as { postId: string };
+  const [post, setPost] = useState<SanitizedPostss|null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState({ title: '', description: '' });
 
@@ -46,7 +50,7 @@ export default function EditPost({ postId }: { postId: string }) {
   const deletePost = async () => {
     const deleted = await DeletePost(postId);
     if (deleted) {
-      setPost(null); // Hide the post after deletion
+      setPost(null); 
     }
   };
 

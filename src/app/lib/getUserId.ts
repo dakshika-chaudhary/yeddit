@@ -1,24 +1,95 @@
 
+// import { cookies } from "next/headers";
+// import { getUserSession } from "../actions";
+
+// export async function getUserIdFromRequest(): Promise<string | null> {
+//   const cookieStore = await cookies();
+//   const sessionToken = cookieStore.get("session")?.value||"";
+  
+//   if (!sessionToken) {
+    
+//     return null;
+//   }
+
+//   const sessionData = await getUserSession();
+//   if (!sessionData) {
+   
+//     return null;
+//   }
+
+
+//   return sessionData?.id || null;
+// }
+
+// import { cookies } from "next/headers";
+// import { getUserSession } from "../actions";
+
+// export const dynamic = 'force-dynamic';
+
+// export async function getUserIdFromRequest(): Promise<string | null> {
+//   try {
+//     // Get cookies from the request headers
+//     const cookieStore = await cookies();
+
+//     // Fetch the session token from cookies
+//     const sessionToken = cookieStore.get("session")?.value || "";
+
+//     // If no session token is found, return null
+//     if (!sessionToken) {
+//       console.log("No session token found.");
+//       return null;
+//     }
+
+//     // Get the user session based on the session token
+//     const sessionData = await getUserSession();
+
+//     // If no session data is found, return null
+//     if (!sessionData) {
+//       console.log("No session data found.");
+//       return null;
+//     }
+ 
+//     // Return the user id from the session data
+//     return sessionData.id || null;
+
+//   } catch (error) {
+//     console.error("Error in getUserIdFromRequest:", error);
+//     return null; // Return null in case of error
+//   }
+// }
+
 import { cookies } from "next/headers";
-import { getUserSession } from "../actions"; // Adjust this import to match your session logic
+import { getUserSession } from "../actions";
+
+export const dynamic = 'force-dynamic';
 
 export async function getUserIdFromRequest(): Promise<string | null> {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get("session")?.value || "";
-  
-  if (!sessionToken) {
-    console.log("No session token found.");
-    return null;
-  }
+  try {
+    // Await the cookies() Promise to get the actual cookie store
+    const cookieStore = await cookies(); // ✅ Await cookies here
 
-  const sessionData = await getUserSession();
-  if (!sessionData) {
-    console.log("Session data not found for token:", sessionToken);
-    return null;
-  }
+    // Fetch the session token from cookies
+    const sessionToken = cookieStore.get("session")?.value;
 
-  console.log("session Token is reached for findin Profile",sessionToken)
-  return sessionData?.id || null;
+    // If no session token is found, return null
+    if (!sessionToken) {
+      console.log("No session token found.");
+      return null;
+    }
+
+    // Get the user session based on the session token
+    const sessionData = await getUserSession();
+
+    // If no session data is found, return null
+    if (!sessionData) {
+      console.log("No session data found.");
+      return null;
+    }
+
+    // Return the user id from the session data
+    return sessionData.id || null;
+  } catch (error) {
+    console.error("Error in getUserIdFromRequest:", error);
+    return null; // Return null in case of error
+  }
 }
-
-

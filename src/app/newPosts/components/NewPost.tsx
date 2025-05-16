@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { styled } from '@mui/material/styles';
+import { SessionUser } from '../../../../types/postTypes';
 import Card from '@mui/material/Card';
 import CardHeader from '@mui/material/CardHeader';
 import { CardContent } from '@mui/material';
@@ -10,7 +10,7 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { red } from '@mui/material/colors';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { getUserSession, getNewPosts } from '@/app/actions';
+import { getUserSession } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import Container from '@mui/material/Container';
 import Image from 'next/image';
@@ -18,35 +18,16 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Modal from '@mui/material/Modal';
 import { LikeDislikeButtons } from '@/app/components/button';
-
-interface Comment {
-  _id: string;
-  user: string;
-  text: string;
-  createdAt: string;
-}
-
-interface Post {
-  _id: string;
-  title: string;
-  description: string;
-  youtubeCode?: string;
-  likes: string[];
-  dislikes: string[];
-  readBy: string[];
-  comments: Comment[];
-  thumbnail?: string;
-  createdAt: string;
-}
-
-export default function NewPosts({ posts: initialPosts }: { posts: Post[] }) {
-  const [posts, setPosts] = useState<Post[]>(initialPosts);
-  const [user, setUser] = useState<any>(null);
+import { Postss } from '../../../../types/postTypes';
+export const dynamic = 'force-dynamic';
+export default function NewPosts({ posts: initialPosts }: { posts: Postss[] }) {
+  const [posts] = useState<Postss[]>(initialPosts);
+  const [user, setUser] = useState<SessionUser|null>(null);
   const [page, setPage] = useState(1);
   const postsPerPage = 6;
   const router = useRouter();
   const [textColor, setTextColor] = useState('black');
-  const [imageColor, setImageColor] = useState('black');
+  const [imageColor] = useState('black');
   const [open, setOpen] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
   const loadMoreRef = useRef(null);
@@ -111,7 +92,7 @@ export default function NewPosts({ posts: initialPosts }: { posts: Post[] }) {
                     <CardHeader
                       avatar={<Avatar sx={{ bgcolor: red[500] }} />}
                       action={<IconButton><MoreVertIcon /></IconButton>}
-                      subheader={new Date(post.createdAt).toISOString()}
+                      subheader={post.createdAt ? new Date(post.createdAt).toISOString() : ''}
                     />
                     <Typography
                       variant="h5"
@@ -226,7 +207,7 @@ export default function NewPosts({ posts: initialPosts }: { posts: Post[] }) {
 }
 
 const modalStyle = {
-  position: 'absolute' as 'absolute',
+  position: 'absolute' ,
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',

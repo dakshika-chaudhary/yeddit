@@ -1,24 +1,36 @@
 
-import MediaSpecificPost from './components/page';
-import { getSpecificPosts } from '@/app/actions';
-import { getUserSession } from '@/app/actions';
 
-export default async function MediaPage({params}) {
+import { getUserSession, getSpecificPosts } from "@/app/actions";
+import MediaSpecificPost from "./components/MediaSpecificPost";
+import { SanitizedPostss, PageProps } from "../../../../types/postTypes";
 
-  const { postid } = await params;
-  const session = await getUserSession();
-  const userId = session?.id?.toString()||"";
 
-  let post = null;
-  if (postid && userId) {
-    post = await getSpecificPosts(postid, userId);
-    post = JSON.parse(JSON.stringify(post));
-  }
+export const dynamic = "force-dynamic";
+
+
+export default async function MediaPage({ params }: PageProps) {
   
+  const { postid } = await params;
+
+  
+  const session = await getUserSession();
+  const userId = session?.id?.toString() || "";
+
+  if (!postid || !userId) {
+    return <p>No post found.</p>;
+  }
+
+  const fetchedPost = await getSpecificPosts(postid, userId);
+
+  if (!fetchedPost) {
+    return <p>No post found.</p>;
+  }
+
+  const sanitizedPost: SanitizedPostss = JSON.parse(JSON.stringify(fetchedPost));
+
   return (
-    <div className="max-w-md mx-auto mt-20" >
-      
-      <MediaSpecificPost post={post} />
+    <div className="max-w-md mx-auto mt-20">
+      <MediaSpecificPost post={sanitizedPost} />
     </div>
   );
 }

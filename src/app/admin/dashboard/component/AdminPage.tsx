@@ -1,73 +1,105 @@
 
-
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Box, Typography, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TablePagination, TableRow,
-  IconButton, Button, Alert, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField
+  Box,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
+  Button,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from "@mui/material";
-import { red } from "@mui/material/colors";
-import Card from "@mui/material/Card";
-import CardHeader from "@mui/material/CardHeader";
-import CardContent from "@mui/material/CardContent";
-import Avatar from "@mui/material/Avatar";
+
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import Image from "next/image";
-import { toast } from "react-hot-toast";
 
+import { toast } from "react-hot-toast";
+import NewPosts from "@/app/newPosts/components/NewPost";
 
 import {
-  deletedPost,
+ 
   deletedUser,
   makeUserAdmin,
   makeUserNormal,
   addNewUser,
-  updateUserInfo
+  updateUserInfo,
 } from "@/app/actions";
 
+import { Postss } from "../../../../../types/postTypes";
+
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+  password?: string;
+}
+
+
+export const dynamic = 'force-dynamic';
 export default function AdminDashboard({
   users,
   posts,
   currentUserID,
 }: {
-  users: any[];
-  posts: any[];
+  users: User[];    
+  posts: Postss[];
   currentUserID: string;
 }) {
   const postsPerPage = 6;
   const router = useRouter();
 
-  const [page, setPage] = useState(1);
-  const [textColor, setTextColor] = useState("black");
-  const [userList, setUserList] = useState(users);
-  const [postList, setPostList] = useState(posts);
+  const [page,setPage] = useState(1);
+   console.log(page)
+ 
+
+  const [userList, setUserList] = useState<User[]>(users);
+  
+
   const loadMoreRef = useRef(null);
-  const [alert, setAlert] = useState<{
+  const [alert] = useState<{
     type: "error" | "warning" | "success";
     text: string;
   } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: "", email: "", role: "user",password:"" });
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    role: "user",
+    password: "",
+  });
+  const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const openPost = (postId: string) => {
+  const openPage = (postId: string) => {
     router.push(`/media/${postId}`);
   };
+  console.log(openPage)
+ 
 
   useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setPage((prev) =>
-          prev < Math.ceil(posts.length / postsPerPage) ? prev + 1 : prev
-        );
-      }
-    }, { threshold: 0.1 });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setPage((prev) =>
+            prev < Math.ceil(posts.length / postsPerPage) ? prev + 1 : prev
+          );
+        }
+      },
+      { threshold: 0.1 }
+    );
 
     const currentRef = loadMoreRef.current;
     if (currentRef) observer.observe(currentRef);
@@ -76,32 +108,33 @@ export default function AdminDashboard({
     };
   }, [posts.length]);
 
+ 
   const performDeletion = async (userId: string) => {
     if (window.confirm("Are you sure you want to delete this user?")) {
       const res = await deletedUser(userId);
       if (res?.success) {
-        setUserList(userList.filter((user) => user._id !== userId));
+        
+        setUserList(userList.filter((user) => user && user._id !== userId));
         toast.success("User deleted successfully");
-      } else toast.error("Failed to delete user");
+      } else {
+        toast.error("Failed to delete user");
+      }
     }
   };
+  
 
-  const performPostDeletion = async (postId: string) => {
-    if (window.confirm("Are you sure you want to delete this post?")) {
-      const res = await deletedPost(postId);
-      if (res?.success) {
-        setPostList(postList.filter((post) => post._id !== postId));
-        toast.success("Post deleted successfully");
-      } else toast.error("Failed to delete post");
-    }
-  };
 
-  const handleModalOpen = (user = null) => {
+  const handleModalOpen = (user: User | null) => {
     if (user && user.name && user.email && user.role) {
-      setFormData({ name: user.name, email: user.email, role: user.role,password:"" });
+      setFormData({
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        password: "",
+      });
       setEditingUser(user);
     } else {
-      setFormData({ name: "", email: "", role: "user",password:"" });
+      setFormData({ name: "", email: "", role: "user", password: "" });
       setEditingUser(null);
     }
     setModalOpen(true);
@@ -112,36 +145,41 @@ export default function AdminDashboard({
     setEditingUser(null);
   };
 
-  const handleFormChange = (e: any) => {
+  const handleFormChange = (e:  React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
     }));
   };
+
+
   const handleFormSubmit = async () => {
     try {
       if (editingUser) {
-        const res = await updateUserInfo({ userId: editingUser._id, ...formData })
-        if(res.success){
+        const updatedData = {
+          userId: editingUser._id,
+          ...formData,
+        };
+        const res = await updateUserInfo(updatedData);
+        if (res.success) {
           const updatedUsers = userList.map((u) =>
             u._id === editingUser._id ? res.user : u
-        );
+          ).filter((user): user is User => user !== undefined); // Ensure no undefined values are added
           setUserList(updatedUsers);
           toast.success("User updated!");
           handleModalClose();
-        }
-        else {
+        } else {
           toast.error(res.message || "Failed to update user");
         }
-       
       } else {
         const res = await addNewUser(formData);
         if (res.success) {
           toast.success("User added!");
-          setUserList((prev) => [...prev, res.user]);
+          
+          setUserList((prev) => [...prev, res.user].filter((user): user is User => user !== undefined)); 
           handleModalClose();
         } else {
-          toast.error(res.message);
+          toast.error(res.message || "Failed to add user");
         }
       }
     } catch (err) {
@@ -155,7 +193,7 @@ export default function AdminDashboard({
     { id: "name", label: "Name", minWidth: 100 },
     { id: "email", label: "Email", minWidth: 170 },
     { id: "role", label: "Role", minWidth: 100 },
-    { id: "edit", label: "Edit", minWidth: 50 }, 
+    { id: "edit", label: "Edit", minWidth: 50 },
     { id: "delete", label: "Delete", minWidth: 50 },
   ];
 
@@ -166,7 +204,7 @@ export default function AdminDashboard({
       </Typography>
 
       <Box display="flex" justifyContent="flex-end" mb={2}>
-        <Button variant="contained" onClick={() => handleModalOpen()}>
+        <Button variant="contained" onClick={() => handleModalOpen(null)}>
           Add New User
         </Button>
       </Box>
@@ -213,7 +251,9 @@ export default function AdminDashboard({
                                   toast.success("User is now admin");
                                   setUserList((prev) =>
                                     prev.map((u) =>
-                                      u._id === user._id ? { ...u, role: "admin" } : u
+                                      u._id === user._id
+                                        ? { ...u, role: "admin" }
+                                        : u
                                     )
                                   );
                                 } else toast.error(res.message);
@@ -229,7 +269,9 @@ export default function AdminDashboard({
                                   toast.success("User is now normal user");
                                   setUserList((prev) =>
                                     prev.map((u) =>
-                                      u._id === user._id ? { ...u, role: "user" } : u
+                                      u._id === user._id
+                                        ? { ...u, role: "user" }
+                                        : u
                                     )
                                   );
                                 } else toast.error(res.message);
@@ -242,12 +284,18 @@ export default function AdminDashboard({
                       )}
                     </TableCell>
                     <TableCell align="center">
-  <IconButton color="primary" onClick={() => handleModalOpen(user)}>
-    <EditIcon />
-  </IconButton>
-</TableCell>
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleModalOpen(user)}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                    </TableCell>
                     <TableCell align="center">
-                      <IconButton color="error" onClick={() => performDeletion(user._id)}>
+                      <IconButton
+                        color="error"
+                        onClick={() => performDeletion(user._id)}
+                      >
                         <DeleteIcon />
                       </IconButton>
                     </TableCell>
@@ -259,115 +307,64 @@ export default function AdminDashboard({
         </Paper>
       </Box>
 
-      {/* Posts Section */}
-      <Box>
-        <Typography variant="h5" sx={{ mb: 2 }}>
-          Posts
-        </Typography>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          {postList.slice(0, page * postsPerPage).map((post) => (
-            <Card key={post._id} sx={{ maxWidth: "100%", mx: "auto", p: 2 }}>
-              <CardHeader
-                avatar={<Avatar sx={{ bgcolor: red[500] }}>{post.author?.[0]}</Avatar>}
-                title={post.author}
-                subheader={new Date(post.createdAt).toISOString()}
-              />
-              <Typography
-                variant="h6"
-                onClick={() => openPost(post._id)}
-                onMouseEnter={() => setTextColor("red")}
-                onMouseLeave={() => setTextColor("black")}
-                sx={{ ml: 2, color: textColor, cursor: "pointer" }}
-              >
-                {post.title}
-              </Typography>
-              <CardContent>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: "text.secondary",
-                    display: "-webkit-box",
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                    WebkitLineClamp: 4,
-                  }}
-                >
-                  {post.description}
-                </Typography>
-              </CardContent>
-              {post.thumbnail && (
-                <Box
-                  sx={{
-                    width: 600,
-                    height: 300,
-                    borderRadius: 2,
-                    overflow: "hidden",
-                    mx: "auto",
-                    "&:hover": {
-                      filter: "grayscale(20%) brightness(75%)",
-                    },
-                  }}
-                >
-                  <Image
-                    src={post.thumbnail}
-                    alt="Post Thumbnail"
-                    width={600}
-                    height={300}
-                    style={{ borderRadius: "0.5rem", cursor: "pointer" }}
-                    onClick={() => openPost(post._id)}
-                  />
-                </Box>
-              )}
-              <Box sx={{ display: "flex", justifyContent: "space-between", px: 2, py: 1 }}>
-                <Typography>{post.readBy?.length || 0} views</Typography>
-                <IconButton color="error" onClick={() => performPostDeletion(post._id)}>
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-            </Card>
-          ))}
-          <div ref={loadMoreRef}></div>
-        </Box>
-      </Box>
 
-      {/* Add/Edit User Modal */}
+<NewPosts posts={posts as Postss[]} />
+
+
+{/* <NewPosts posts={postList as unknown  as Postss[]} /> */}
+      {/* Modal for User Form */}
       <Dialog open={modalOpen} onClose={handleModalClose}>
-        <DialogTitle>{editingUser ? "Edit User" : "Add User"}</DialogTitle>
+        <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
         <DialogContent>
           <TextField
-            name="name"
-            label="Name"
             fullWidth
             margin="dense"
+            name="name"
+            label="Name"
+            variant="outlined"
             value={formData.name}
             onChange={handleFormChange}
           />
           <TextField
-            name="email"
-            label="Email"
             fullWidth
             margin="dense"
+            name="email"
+            label="Email"
+            variant="outlined"
             value={formData.email}
             onChange={handleFormChange}
           />
           <TextField
-  margin="dense"
-  label="Password"
-  name="password"
-  type="password"
-  fullWidth
-  variant="outlined"
-  value={formData.password}
-  onChange={handleFormChange}
-/>
+            fullWidth
+            margin="dense"
+            name="role"
+            label="Role"
+            variant="outlined"
+            value={formData.role}
+            onChange={handleFormChange}
+          />
+          <TextField
+            fullWidth
+            margin="dense"
+            name="password"
+            label="Password"
+            variant="outlined"
+            type="password"
+            value={formData.password}
+            onChange={handleFormChange}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleModalClose}>Cancel</Button>
-          <Button variant="contained" onClick={handleFormSubmit}>
-            Save
+          <Button onClick={handleModalClose} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleFormSubmit} color="primary">
+            {editingUser ? "Save Changes" : "Add User"}
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Box> 
+
   );
 }
+

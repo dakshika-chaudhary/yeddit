@@ -2,14 +2,15 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
+import { SessionPayload } from '../../../types/postTypes';
 
 const secretKey = process.env.SESSION_SECRET;
 if (!secretKey) {
     throw new Error('SESSION_SECRET is not set');
 }
 const encodedKey = new TextEncoder().encode(secretKey);
-
-export async function encrypt(payload: any) {
+export const dynamic = 'force-dynamic';
+export async function encrypt(payload:SessionPayload) {
     return new SignJWT(payload)
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()

@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Container,
+  
   Card,
   CardContent,
   Typography,
@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import UserPosts from "@/app/components/UserPosts";
 
+export const dynamic = 'force-dynamic';
 export default function UserProfile({
   user,
 }: {
@@ -23,7 +24,7 @@ export default function UserProfile({
 
   if (!user) return <Typography>Loading user profile...</Typography>;
 
-  console.log("Frontend received user:", user);
+ 
 
   return (
     <Grid

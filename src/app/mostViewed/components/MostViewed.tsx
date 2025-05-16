@@ -1,8 +1,9 @@
 
 'use client';
+
 import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { styled } from '@mui/material/styles';
+
 import Card from '@mui/material/Card';
 import CardHeader from '@mui/material/CardHeader';
 import { CardContent } from '@mui/material';
@@ -11,7 +12,7 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { red } from '@mui/material/colors';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { getUserSession, getMostViewedPosts } from '@/app/actions'; // Change to fetch most viewed posts
+import { getUserSession } from '@/app/actions'; // Change to fetch most viewed posts
 import { useRouter } from 'next/navigation';
 import Container from '@mui/material/Container';
 import Image from 'next/image';
@@ -19,40 +20,21 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Modal from '@mui/material/Modal';
 import { LikeDislikeButtons } from '@/app/components/button';
-
-interface Comment {
-  _id: string;
-  user: string;
-  text: string;
-  createdAt: string;
-}
-
-interface Post {
-  _id: string;
-  title: string;
-  description: string;
-  youtubeCode?: string;
-  likes: string[];
-  dislikes: string[];
-  readBy: string[];
-  comments: Comment[];
-  thumbnail?: string;
-  createdAt: string;
-}
-
-export default function MostViewed({ posts: initialPosts }: { posts: Post[] }) {
-  const [posts, setPosts] = useState<Post[]>(initialPosts);
-  const [user, setUser] = useState<any>(null);
+import { Postss,SessionUser } from '../../../../types/postTypes';
+export const dynamic = 'force-dynamic';
+export default function MostViewed({ posts: initialPosts }: { posts: Postss[] }) {
+  const [posts] = useState<Postss[]>(initialPosts);
+  const [user, setUser] = useState<SessionUser|null>(null);
   const [page, setPage] = useState(1);
   const postsPerPage = 6;
   const router = useRouter();
   const [textColor, setTextColor] = useState('black');
-  const [imageColor, setImageColor] = useState('black');
+  const [imageColor] = useState('black');
   const [open, setOpen] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
   const loadMoreRef = useRef(null);
 
-  // Fetching user session when component mounts
+  
   useEffect(() => {
     async function fetchUser() {
       const sessionUser = await getUserSession();
@@ -62,7 +44,7 @@ export default function MostViewed({ posts: initialPosts }: { posts: Post[] }) {
     fetchUser();
   }, []);
 
-  // Handle clicking on a post to see comments
+  
   const handleCommentClick = (postId: string) => {
     if (!user) {
       setPopupMessage("You need to log in to comment on posts.");
@@ -72,12 +54,12 @@ export default function MostViewed({ posts: initialPosts }: { posts: Post[] }) {
     router.push(`/media/${postId}`);
   };
 
-  // Open a post when clicked
+ 
   const openPost = (postId: string) => {
     router.push(`/media/${postId}`);
   };
 
-  // Infinite scroll logic
+ 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -116,7 +98,7 @@ export default function MostViewed({ posts: initialPosts }: { posts: Post[] }) {
                     <CardHeader
                       avatar={<Avatar sx={{ bgcolor: red[500] }} />}
                       action={<IconButton><MoreVertIcon /></IconButton>}
-                      subheader={new Date(post.createdAt).toISOString()}
+                      subheader={post.createdAt ? new Date(post.createdAt).toISOString() : ''}
                     />
                     <Typography
                       variant="h5"
@@ -172,6 +154,7 @@ export default function MostViewed({ posts: initialPosts }: { posts: Post[] }) {
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body1" sx={{ p: 2 }}>
                           {post.readBy?.length || 0} views
+                          
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           {post._id && (
@@ -231,7 +214,7 @@ export default function MostViewed({ posts: initialPosts }: { posts: Post[] }) {
 }
 
 const modalStyle = {
-  position: 'absolute' as 'absolute',
+  position: 'absolute',
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
@@ -239,3 +222,4 @@ const modalStyle = {
   boxShadow: 24,
   p: 4,
 };
+

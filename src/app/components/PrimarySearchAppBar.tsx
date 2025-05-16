@@ -9,14 +9,13 @@ import {
   Toolbar,
   Typography,
   IconButton,
-  InputBase,
-  MenuItem,
+  // InputBase,
   Menu,
   List,
   ListItem,
   Drawer,
 } from "@mui/material";
-import { styled, alpha } from "@mui/material/styles";
+
 import MenuIcon from "@mui/icons-material/Menu";
 
 import AccountCircle from "@mui/icons-material/AccountCircle";
@@ -25,32 +24,7 @@ import Link from "next/link";
 import LogoutButton from "../logout/page";
 
 
-const Search = styled("div")(({ theme }) => ({
-  position: "relative",
-  borderRadius: theme.shape.borderRadius,
-  backgroundColor: alpha(theme.palette.common.white, 0.15),
-  "&:hover": { backgroundColor: alpha(theme.palette.common.white, 0.25) },
-  marginLeft: theme.spacing(2),
-  width: "100%",
-  [theme.breakpoints.up("sm")]: { width: "auto" },
-}));
 
-const SearchIconWrapper = styled("div")(({ theme }) => ({
-  padding: theme.spacing(0, 2),
-  height: "100%",
-  position: "absolute",
-  pointerEvents: "none",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-}));
-
-const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  color: "inherit",
-  width: "100%",
-  paddingLeft: `calc(1em + ${theme.spacing(4)})`,
-  [theme.breakpoints.up("md")]: { width: "20ch" },
-}));
 
 interface UserType {
   _id: string;
@@ -69,23 +43,21 @@ const UserMenuItems = ({ userId, onClose }: {  userId: UserType  | null; onClose
            {userId.role === "admin" ? (
           
               <ListItem onClick={onClose}>
-                <Link href="/admin/dashboard">Admin Dashboard</Link>
+                <Link href="/admin/dashboard"  style={{textDecoration: "none"}}>Admin Dashboard</Link>
               </ListItem>
             ) : (
               console.log(`userId is: ${userId._id}`),
               userId._id ? (
                 
                 <ListItem onClick={onClose}>
-                  <Link href={`/profile/${userId._id}`}>Profile</Link>
+                  <Link href={`/profile/${userId._id}`}  style={{textDecoration: "none"}}>Profile</Link>
                 </ListItem>
               ) : null
-              // <ListItem onClick={onClose}>
-              //   <Link href={`/profile/${userId.id}`}>Profile</Link>
-              // </ListItem>
+             
             )}
       
           <ListItem onClick={onClose}>
-            <Link href={`/users/${userId._id}`}>Your Posts</Link>
+            <Link href={`/users/${userId._id}` } style={{textDecoration: "none"}}>Your Posts</Link>
           </ListItem>
           <ListItem>
             <LogoutButton />
@@ -94,10 +66,10 @@ const UserMenuItems = ({ userId, onClose }: {  userId: UserType  | null; onClose
       ) : (
         <>
           <ListItem onClick={onClose}>
-            <Link href="/login">Login</Link>
+            <Link href="/login" style={{textDecoration: "none"}}>Login</Link>
           </ListItem>
           <ListItem onClick={onClose}>
-            <Link href="/signUp">Sign Up</Link>
+            <Link href="/signUp" style={{textDecoration: "none"}}>Sign Up</Link>
           </ListItem>
         </>
       )}
@@ -105,6 +77,8 @@ const UserMenuItems = ({ userId, onClose }: {  userId: UserType  | null; onClose
   </Box>
 );
 };
+
+export const dynamic = 'force-dynamic';
 
 export default function PrimarySearchAppBar({ userId }: { userId: UserType | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -137,10 +111,10 @@ export default function PrimarySearchAppBar({ userId }: { userId: UserType | nul
           </Typography>
 
          
-          <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center" }}>
-            <Link href="/" style={{ marginRight: 16 }}>Home</Link>
-            <Link href="/mostViewed" style={{ marginRight: 18 }}>Most Viewed</Link>
-            <Link href="/newPosts" style={{ marginRight: 18 }}>New Posts</Link>
+          <Box sx={{ display: { xs: "none", md: "flex",color:"white" }, alignItems: "center" }}>
+            <Link href="/" style={{  textDecoration: "none",color: "white",marginRight: 16 }}>Home</Link>
+            <Link href="/mostViewed" style={{ textDecoration: "none", color: "white",marginRight: 18 }}>Most Viewed</Link>
+            <Link href="/newPosts" style={{  textDecoration: "none",color: "white",marginRight: 18 }}>New Posts</Link>
             <IconButton size="large" color="inherit" onClick={handleProfileMenuOpen}>
               <AccountCircle />
             </IconButton>
@@ -159,9 +133,9 @@ export default function PrimarySearchAppBar({ userId }: { userId: UserType | nul
       <Drawer anchor="left" open={mobileOpen} onClose={toggleDrawer(false)}>
         <Box sx={{ width: 250, padding: 2 }}>
           <List>
-            <ListItem><Link href="/">Home</Link></ListItem>
-            <ListItem><Link href="/mostViewed">Most Viewed</Link></ListItem>
-            <ListItem><Link href="/newPosts">New Posts</Link></ListItem>
+            <ListItem><Link href="/" style={{textDecoration: "none"}}>Home</Link></ListItem>
+            <ListItem><Link href="/mostViewed" style={{textDecoration: "none"}}>Most Viewed</Link></ListItem>
+            <ListItem><Link href="/newPosts" style={{textDecoration: "none"}}>New Posts</Link></ListItem>
             <UserMenuItems userId={userId} onClose={toggleDrawer(false)} />
           </List>
         </Box>

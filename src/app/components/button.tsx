@@ -6,7 +6,8 @@ import { getUserSession, incrementLikes, decrementLikes } from '@/app/actions';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownAltIcon from '@mui/icons-material/ThumbDownAlt';
 import { Box, IconButton, Snackbar, Alert,Typography } from "@mui/material";
-
+import { SessionUser } from "../../../types/postTypes";
+export const dynamic = 'force-dynamic';
 export function SubmitButton({ disabled }: { disabled: boolean }) {
   return (
     <button disabled={disabled} 
@@ -34,7 +35,7 @@ export function LikeDislikeButtons({ initialLikes, initialDislikes, postId }: { 
   const [dislikes, setDislikes] = useState(initialDislikes);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
-  const [user, setUser] = useState(null); // Store user session
+  const [user, setUser] = useState<SessionUser | null>(null); // Store user session
   const [openSnackbar, setOpenSnackbar] = useState(false); // Snackbar for login prompt
 
   useEffect(() => {
@@ -61,20 +62,20 @@ export function LikeDislikeButtons({ initialLikes, initialDislikes, postId }: { 
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-      {/* Like Button */}
+      
       <IconButton 
         color={liked ? "error" : "default"}
         onClick={async () => {
           try {
             if (!user) {
-              setOpenSnackbar(true); // Show login prompt
+              setOpenSnackbar(true); 
               return;
             }
 
-            console.log("Liked");
+            
             const newData = await incrementLikes(postId);
             if (!newData) {
-              console.error("Failed to fetch updated likes/dislikes.");
+              
               return;
             }
 
@@ -86,10 +87,9 @@ export function LikeDislikeButtons({ initialLikes, initialDislikes, postId }: { 
             localStorage.setItem(`liked-${postId}`, "true");
             localStorage.setItem(`disliked-${postId}`, "false");
 
-            console.log("Likes updated:", newData.likes);
-            console.log("Dislikes updated:", newData.dislikes);
+         
           } catch (error) {
-            console.error("Error updating likes:", error);
+           console.log(error)
           }
         }}
       >
@@ -97,7 +97,6 @@ export function LikeDislikeButtons({ initialLikes, initialDislikes, postId }: { 
       </IconButton>
       <Typography variant="body1">{likes}</Typography>
 
-      {/* Dislike Button */}
       <IconButton 
         color={disliked ? "error" : "default"}
         onClick={async () => {
@@ -107,10 +106,10 @@ export function LikeDislikeButtons({ initialLikes, initialDislikes, postId }: { 
               return;
             }
 
-            console.log("Disliked");
+            
             const newData = await decrementLikes(postId);
             if (!newData) {
-              console.error("Failed to fetch updated likes/dislikes.");
+              
               return;
             }
 
@@ -122,10 +121,9 @@ export function LikeDislikeButtons({ initialLikes, initialDislikes, postId }: { 
             localStorage.setItem(`liked-${postId}`, "false");
             localStorage.setItem(`disliked-${postId}`, "true");
 
-            console.log("Likes updated:", newData.likes);
-            console.log("Dislikes updated:", newData.dislikes);
+           
           } catch (error) {
-            console.error("Error updating dislikes:", error);
+          console.log(error)
           }
         }}
       >
